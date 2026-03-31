@@ -13,6 +13,10 @@ concept Diagram [ConceptName]
       post: rendered += d
            linked[d] = c
 
+    mark_stale (d: Diagram)
+      pre: d in rendered
+      post: stale += d
+
     refresh (d: Diagram)
       pre: d in stale
       post: stale -= d
@@ -24,6 +28,6 @@ concept Diagram [ConceptName]
            linked -= d->
 
   sync
-    when Concept.articulate (c) then stale (d)
-    when Concept.specify (c) then stale (d)
-    when Concept.revise (c) then stale (d)
+    when Concept.articulate (c) then mark_stale (d)
+    when Concept.specify (c) then mark_stale (d)
+    when Concept.revise (c) then mark_stale (d)

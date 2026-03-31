@@ -2,7 +2,8 @@ import json
 import os
 from mcp.server.fastmcp import FastMCP
 from ..parser import ParseError, parse_concept, parse_file
-from ._io import list_concept_names
+from ..validator import validate_concept as _validate_ast, validate_workspace
+from ._io import list_concept_names, load_all_concepts
 
 
 def register_concept_tools(mcp: FastMCP, concepts_dir: str) -> None:
@@ -48,18 +49,39 @@ def register_concept_tools(mcp: FastMCP, concepts_dir: str) -> None:
     @mcp.tool(
         description=(
             "Validate .concept source text without writing to disk. "
-            "Returns 'valid' or a list of parse errors."
+            "Checks syntax, internal consistency (state refs, action clauses, sync invocations), "
+            "and optionally cross-concept consistency when workspace concepts are available. "
+            "Returns validation result with any errors and warnings."
         )
     )
     def validate_concept(source: str) -> str:
         try:
             ast = parse_concept(source)
-            return json.dumps({
-                "valid": True,
-                "name": ast.name,
-                "params": ast.params,
-                "action_count": len(ast.actions),
-                "state_count": len(ast.state),
-            })
         except ParseError as e:
             return json.dumps({"valid": False, "error": str(e)})
+
+        # Single-concept static validation
+        single_result = _validate_ast(ast)
+
+        # Cross-concept validation if workspace has other concepts
+        all_concepts = load_all_concepts(concepts_dir)
+        # Replace or add the current concept being validated
+        other_concepts = [c for c in all_concepts if c.name != ast.name]
+        workspace_concepts = other_concepts + [ast]
+
+        if len(workspace_concepts) > 1:
+            workspace_result = validate_workspace(workspace_concepts)
+            issues = workspace_result.to_dict()["issues"]
+        else:
+            issues = single_result.to_dict()["issues"]
+
+        has_errors = any(i["severity"] == "error" for i in issues)
+
+        return json.dumps({
+            "valid": not has_errors,
+            "name": ast.name,
+            "params": ast.params,
+            "action_count": len(ast.actions),
+            "state_count": len(ast.state),
+            "issues": issues,
+        })
