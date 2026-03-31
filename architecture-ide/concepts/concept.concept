@@ -1,0 +1,32 @@
+concept Concept [Designer]
+  purpose
+    Define a named, self-contained unit of software functionality
+    with explicit state and operations
+
+  state
+    named: set ConceptName
+    purposeful: named
+    specified: purposeful
+
+  actions
+    introduce (c: ConceptName)
+      pre: c not in named
+      post: named += c
+
+    articulate (c: ConceptName)
+      pre: c in named
+      post: purposeful += c
+
+    specify (c: ConceptName)
+      pre: c in purposeful
+      post: specified += c
+
+    revise (c: ConceptName)
+      pre: c in specified
+      post: specified -= c
+
+    retire (c: ConceptName)
+      pre: c in named
+      post: named -= c
+           purposeful -= c
+           specified -= c

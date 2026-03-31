@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "concept-lang": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "concept-lang"],
+      "env": {
+        "CONCEPTS_DIR": "./concepts"
+      }
+    }
+  }
+}
