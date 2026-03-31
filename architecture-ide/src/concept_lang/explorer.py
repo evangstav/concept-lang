@@ -138,15 +138,15 @@ def generate_explorer(concepts: list[ConceptAST]) -> str:
     dep_graph_mermaid = concept_graph(concepts) if concepts else "graph TD\n    empty[No concepts]"
 
     return _HTML_TEMPLATE.replace(
-        "/*__CONCEPT_DATA__*/", json.dumps(concept_data, indent=2)
+        "/*__CONCEPT_DATA__*/{}", json.dumps(concept_data, indent=2)
     ).replace(
-        "/*__GRAPH_DATA__*/", json.dumps(graph_data, indent=2)
+        '/*__GRAPH_DATA__*/{"nodes":[],"edges":[]}', json.dumps(graph_data, indent=2)
     ).replace(
-        "/*__SYNC_INDEX__*/", json.dumps(sync_index, indent=2)
+        "/*__SYNC_INDEX__*/{}", json.dumps(sync_index, indent=2)
     ).replace(
-        "/*__MERMAID_DIAGRAMS__*/", json.dumps(mermaid_diagrams, indent=2)
+        "/*__MERMAID_DIAGRAMS__*/{}", json.dumps(mermaid_diagrams, indent=2)
     ).replace(
-        "/*__DEP_GRAPH_MERMAID__*/", json.dumps(dep_graph_mermaid)
+        '/*__DEP_GRAPH_MERMAID__*/"graph TD"', json.dumps(dep_graph_mermaid)
     )
 
 
