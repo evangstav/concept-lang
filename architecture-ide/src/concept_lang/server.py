@@ -1,6 +1,6 @@
 import os
 from mcp.server.fastmcp import FastMCP
-from .tools import register_concept_tools, register_diagram_tools, register_explorer_tools, register_scaffold_tools
+from .tools import register_codegen_tools, register_concept_tools, register_diagram_tools, register_explorer_tools, register_scaffold_tools
 from .resources import register_resources
 from .prompts import register_prompts
 
@@ -11,6 +11,7 @@ def create_server(concepts_dir: str | None = None) -> FastMCP:
 
     mcp = FastMCP("concept-lang")
 
+    register_codegen_tools(mcp, concepts_dir)
     register_concept_tools(mcp, concepts_dir)
     register_diagram_tools(mcp, concepts_dir)
     register_scaffold_tools(mcp, concepts_dir)
