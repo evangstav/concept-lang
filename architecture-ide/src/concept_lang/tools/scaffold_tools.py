@@ -48,6 +48,11 @@ A concept spec has this format:
 
       sync
         when OtherConcept.action (params) then local_action (params)
+        // or multi-line with conditions:
+        when OtherConcept.action (params) -> result
+          where condition_clause
+          then local_action1 (params)
+               local_action2 (params)
 
 Key principles:
 - Each concept must have a SINGLE, INDEPENDENT purpose

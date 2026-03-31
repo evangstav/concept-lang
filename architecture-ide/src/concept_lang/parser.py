@@ -19,12 +19,17 @@ Format:
                 continuation
 
       sync
+        // single-line form
         when Concept.action (params) then local_action (params)
-        ...
+        // multi-line when/where/then form
+        when Concept.action (params) -> result
+          where condition_clause
+          then action1 (params)
+               action2 (params)
 """
 
 import re
-from .models import Action, ConceptAST, PrePost, StateDecl, SyncClause
+from .models import Action, ConceptAST, PrePost, StateDecl, SyncClause, SyncInvocation
 
 
 class ParseError(Exception):
@@ -253,33 +258,145 @@ def _parse_single_action(header: str, body_lines: list[str]) -> Action:
     return Action(name=name, params=params, pre=pre, post=post)
 
 
+def _parse_invocation(text: str) -> SyncInvocation | None:
+    """Parse a single action invocation like 'open (u, s)' or 'track (s)'."""
+    m = re.match(r"^(\w+)\s*\(([^)]*)\)$", text.strip())
+    if not m:
+        return None
+    params = [p.strip() for p in m.group(2).split(",") if p.strip()]
+    return SyncInvocation(action=m.group(1), params=params)
+
+
 def _parse_sync(lines: list[str]) -> list[SyncClause]:
     """
-    Parse sync clauses:
+    Parse sync clauses in when/where/then pattern.
+
+    Single-line form (backward compatible):
         when Concept.action (params) then local_action (params)
+
+    Multi-line form:
+        when Concept.action (params) -> result
+          where condition
+          then action1 (params)
+               action2 (params)
     """
     clauses: list[SyncClause] = []
+    if not lines:
+        return clauses
+
+    # Find the indent level of 'when' lines (first non-blank line)
+    when_indent = None
+    for line in lines:
+        if line.strip():
+            when_indent = _get_indent(line)
+            break
+    if when_indent is None:
+        return clauses
+
+    # Group lines by 'when' block
+    blocks: list[list[str]] = []
+    current_block: list[str] = []
+
     for line in lines:
         stripped = _strip_inline_comment(line).strip()
         if not stripped:
             continue
-        m = re.match(
-            r"^when\s+(\w+)\.(\w+)\s*\(([^)]*)\)\s+then\s+(\w+)\s*\(([^)]*)\)$",
-            stripped,
-        )
-        if m:
-            trigger_params = [p.strip() for p in m.group(3).split(",") if p.strip()]
-            local_params = [p.strip() for p in m.group(5).split(",") if p.strip()]
-            clauses.append(
-                SyncClause(
-                    trigger_concept=m.group(1),
-                    trigger_action=m.group(2),
-                    trigger_params=trigger_params,
-                    local_action=m.group(4),
-                    local_params=local_params,
-                )
-            )
+        ind = _get_indent(line)
+        if ind == when_indent and stripped.startswith("when "):
+            if current_block:
+                blocks.append(current_block)
+            current_block = [stripped]
+        elif current_block:
+            current_block.append(stripped)
+
+    if current_block:
+        blocks.append(current_block)
+
+    for block in blocks:
+        clause = _parse_sync_block(block)
+        if clause:
+            clauses.append(clause)
+
     return clauses
+
+
+_WHEN_PATTERN = re.compile(
+    r"^when\s+(\w+)\.(\w+)\s*\(([^)]*)\)"  # when Concept.action (params)
+    r"(?:\s*->\s*(.+?))?"                    # optional -> result
+    r"(?:\s+then\s+(.+))?$"                  # optional inline then
+)
+
+
+def _parse_sync_block(block: list[str]) -> SyncClause | None:
+    """Parse a when/where/then block (single or multi-line)."""
+    if not block:
+        return None
+
+    header = block[0]
+    m = _WHEN_PATTERN.match(header)
+    if not m:
+        return None
+
+    trigger_concept = m.group(1)
+    trigger_action = m.group(2)
+    trigger_params = [p.strip() for p in m.group(3).split(",") if p.strip()]
+    trigger_result = m.group(4).strip() if m.group(4) else None
+    inline_then = m.group(5)
+
+    # Single-line form: when C.a (p) then local (p)
+    if inline_then:
+        inv = _parse_invocation(inline_then)
+        if inv:
+            return SyncClause(
+                trigger_concept=trigger_concept,
+                trigger_action=trigger_action,
+                trigger_params=trigger_params,
+                trigger_result=trigger_result,
+                invocations=[inv],
+            )
+        return None
+
+    # Multi-line form: parse where/then from remaining lines
+    where_clauses: list[str] = []
+    invocations: list[SyncInvocation] = []
+    current_section: str | None = None
+
+    for line in block[1:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Check for section keywords
+        where_match = re.match(r"^where\s+(.+)$", stripped)
+        then_match = re.match(r"^then\s+(.+)$", stripped)
+
+        if where_match:
+            current_section = "where"
+            where_clauses.append(where_match.group(1).strip())
+        elif then_match:
+            current_section = "then"
+            inv = _parse_invocation(then_match.group(1))
+            if inv:
+                invocations.append(inv)
+        elif current_section == "where":
+            where_clauses.append(stripped)
+        elif current_section == "then":
+            inv = _parse_invocation(stripped)
+            if inv:
+                invocations.append(inv)
+
+    # Multi-line must have at least a then clause
+    if not invocations:
+        return None
+
+    return SyncClause(
+        trigger_concept=trigger_concept,
+        trigger_action=trigger_action,
+        trigger_params=trigger_params,
+        trigger_result=trigger_result,
+        where_clauses=where_clauses,
+        invocations=invocations,
+    )
 
 
 def parse_file(path: str) -> ConceptAST:

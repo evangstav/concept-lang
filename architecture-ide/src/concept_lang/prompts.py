@@ -29,7 +29,15 @@ A concept has:
 - **purpose**: one sentence stating the essential service this concept provides
 - **state**: typed declarations using `set T` for sets and `A -> set B` for relations
 - **actions**: each with a signature `name (param: Type)`, optional `pre:` conditions and `post:` effects using `+=` and `-=` on sets
-- **sync**: operational composition with other concepts using `when OtherConcept.action (params) then local_action (params)`
+- **sync**: operational composition using when/where/then pattern:
+  - Single-line: `when OtherConcept.action (params) then local_action (params)`
+  - Multi-line with conditions and multiple actions:
+    ```
+    when OtherConcept.action (params) -> result
+      where condition_clause
+      then local_action1 (params)
+           local_action2 (params)
+    ```
 
 Key principles from Jackson:
 1. Each concept must have a **single, independent purpose** — not a grab-bag of features
