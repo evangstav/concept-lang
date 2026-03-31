@@ -42,3 +42,17 @@ class ConceptAST(BaseModel):
     actions: list[Action]
     sync: list[SyncClause]
     source: str             # raw source text
+
+
+class ConceptBinding(BaseModel):
+    """A concept instantiation in an app spec, with its type parameter bindings."""
+    name: str                   # concept name e.g. "Password"
+    bindings: list[str]         # type param bindings e.g. ["User"] for Password[User]
+
+
+class AppSpec(BaseModel):
+    """An app spec declaring which concepts compose into a system."""
+    name: str                   # app name e.g. "SocialNetwork"
+    purpose: str                # free-text description
+    concepts: list[ConceptBinding]
+    source: str                 # raw source text
