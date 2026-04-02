@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "concept-lang": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}/architecture-ide", "concept-lang"],
+      "env": {
+        "CONCEPTS_DIR": "${user_config.concepts_dir}"
+      }
+    }
+  }
+}

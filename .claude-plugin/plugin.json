@@ -1,0 +1,17 @@
+{
+  "name": "concept-lang",
+  "version": "0.1.0",
+  "description": "Daniel Jackson-style concept design toolkit — build, review, scaffold, and explore concept specs via MCP",
+  "author": {
+    "name": "evangstav"
+  },
+  "repository": "https://github.com/evangstav/concept-lang",
+  "license": "MIT",
+  "keywords": ["mcp", "concept-lang", "concept-design", "dsl", "daniel-jackson"],
+  "userConfig": {
+    "concepts_dir": {
+      "description": "Path to your .concept files directory (e.g., ./concepts or ~/my-project/concepts)",
+      "sensitive": false
+    }
+  }
+}
