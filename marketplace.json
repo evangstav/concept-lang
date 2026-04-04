@@ -1,26 +1,16 @@
 {
-  "version": "1.0.0",
+  "name": "concept-lang-marketplace",
   "owner": {
     "name": "evangstav",
     "url": "https://github.com/evangstav"
   },
-  "description": "Daniel Jackson-style concept design plugins",
+  "description": "Daniel Jackson-style concept design plugins for Claude Code",
   "plugins": [
     {
-      "id": "concept-lang",
-      "name": "Concept Language",
+      "name": "concept-lang",
+      "source": ".",
       "description": "MCP server for building, reviewing, scaffolding, and exploring Daniel Jackson-style concept specs",
-      "author": {
-        "name": "evangstav"
-      },
-      "version": "0.1.0",
-      "source": {
-        "source": "github",
-        "owner": "evangstav",
-        "repo": "concept-lang"
-      },
-      "keywords": ["mcp", "concept-lang", "concept-design", "dsl"],
-      "license": "MIT"
+      "version": "0.1.0"
     }
   ]
 }

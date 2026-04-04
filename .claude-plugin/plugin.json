@@ -8,6 +8,8 @@
   "repository": "https://github.com/evangstav/concept-lang",
   "license": "MIT",
   "keywords": ["mcp", "concept-lang", "concept-design", "dsl", "daniel-jackson"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "userConfig": {
     "concepts_dir": {
       "description": "Path to your .concept files directory (e.g., ./concepts or ~/my-project/concepts)",
