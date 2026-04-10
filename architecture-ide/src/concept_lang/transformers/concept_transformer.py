@@ -3,9 +3,12 @@
 from lark import Token, Transformer, v_args
 
 from concept_lang.ast import (
+    Action,
+    ActionCase,
     ConceptAST,
     OperationalPrinciple,
     StateDecl,
+    TypedName,
 )
 
 
@@ -29,6 +32,9 @@ class ConceptTransformer(Transformer):
     def TYPE_EXPR(self, token: Token) -> str:
         return str(token).strip()
 
+    def TYPE_REF(self, token: Token) -> str:
+        return str(token).strip()
+
     # --- sections ------------------------------------------------------------
 
     def type_params(self, *names: str) -> list[str]:
@@ -46,12 +52,45 @@ class ConceptTransformer(Transformer):
     def state_section(self, *decls: StateDecl) -> list[StateDecl]:
         return list(decls)
 
+    def typed_name(self, name: str, type_ref: str) -> TypedName:
+        return TypedName(name=name, type_expr=type_ref)
+
+    def typed_name_list(self, *names: TypedName) -> list[TypedName]:
+        return list(names)
+
+    def action_case(self, name: str, *rest) -> tuple[str, ActionCase]:
+        # rest contains up to two typed_name_list results (inputs, outputs).
+        # Either may be absent if the corresponding `[ ]` bracket was empty.
+        inputs: list[TypedName] = []
+        outputs: list[TypedName] = []
+        list_args = [r for r in rest if isinstance(r, list)]
+        if len(list_args) == 2:
+            inputs, outputs = list_args
+        elif len(list_args) == 1:
+            idx_first_list = next(i for i, r in enumerate(rest) if isinstance(r, list))
+            if idx_first_list == 0:
+                inputs = list_args[0]
+            else:
+                outputs = list_args[0]
+        return name, ActionCase(inputs=inputs, outputs=outputs, body=[], effects=[])
+
+    def actions_section(self, *cases: tuple[str, ActionCase]) -> list[Action]:
+        grouped: dict[str, list[ActionCase]] = {}
+        order: list[str] = []
+        for name, case in cases:
+            if name not in grouped:
+                grouped[name] = []
+                order.append(name)
+            grouped[name].append(case)
+        return [Action(name=n, cases=grouped[n]) for n in order]
+
     # --- top level -----------------------------------------------------------
 
     def concept_def(self, name: str, *rest) -> ConceptAST:
         params: list[str] = []
         purpose: str = ""
         state: list[StateDecl] = []
+        actions: list[Action] = []
         for item in rest:
             if isinstance(item, list) and item:
                 head = item[0]
@@ -59,6 +98,8 @@ class ConceptTransformer(Transformer):
                     params = item
                 elif isinstance(head, StateDecl):
                     state = item
+                elif isinstance(head, Action):
+                    actions = item
             elif isinstance(item, str):
                 purpose = item
         return ConceptAST(
@@ -66,7 +107,7 @@ class ConceptTransformer(Transformer):
             params=params,
             purpose=purpose,
             state=state,
-            actions=[],
+            actions=actions,
             operational_principle=OperationalPrinciple(steps=[]),
             source="",
         )

@@ -1,4 +1,4 @@
-// concept-lang 0.2.0 — concept grammar (header + purpose + state)
+// concept-lang 0.2.0 — concept grammar (header + purpose + state + actions headers)
 // See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.1.
 //
 // INVARIANT: section keywords ("purpose", "state", "actions", "operational",
@@ -12,7 +12,7 @@
 
 start: concept_def
 
-concept_def: "concept" NAME type_params? purpose_section state_section?
+concept_def: "concept" NAME type_params? purpose_section state_section? actions_section?
 
 type_params: "[" NAME ("," NAME)* "]"
 
@@ -22,8 +22,17 @@ purpose_body: PURPOSE_LINE+
 state_section: "state" state_decl+
 state_decl: NAME ":" TYPE_EXPR
 
-// TYPE_EXPR is the full-line type in a state decl: "set Item", "U -> string", etc.
+actions_section: "actions" action_case+
+action_case: NAME "[" typed_name_list? "]" "=>" "[" typed_name_list? "]"
+
+typed_name_list: typed_name (";" typed_name)*
+typed_name: NAME ":" TYPE_REF
+
 TYPE_EXPR: /[^\n]+/
+// TYPE_REF is a restricted type used inside `[ name: TYPE ]` brackets —
+// stops at `;` and `]`. Allows generic `->` returns like `U -> string` but
+// not newlines.
+TYPE_REF: /[A-Za-z_][A-Za-z0-9_ \->]*/
 
 PURPOSE_LINE: /[ \t]+[^\n]+/
 

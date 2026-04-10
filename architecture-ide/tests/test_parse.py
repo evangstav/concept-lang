@@ -96,3 +96,57 @@ concept Password [U]
         assert len(ast.state) == 2
         assert ast.state[1].name == "salt"
         assert ast.state[1].type_expr == "U -> string"
+
+
+class TestConceptActionHeaders:
+    def test_single_action_no_body(self):
+        src = """
+concept Counter
+
+  purpose
+    increment a value
+
+  actions
+    increment [ amount: int ] => [ total: int ]
+"""
+        ast = parse_concept_source(src)
+        assert len(ast.actions) == 1
+        action = ast.actions[0]
+        assert action.name == "increment"
+        assert len(action.cases) == 1
+        case = action.cases[0]
+        assert [(i.name, i.type_expr) for i in case.inputs] == [("amount", "int")]
+        assert [(o.name, o.type_expr) for o in case.outputs] == [("total", "int")]
+
+    def test_empty_output(self):
+        src = """
+concept Logger
+
+  purpose
+    record events
+
+  actions
+    log [ message: string ] => [ ]
+"""
+        ast = parse_concept_source(src)
+        action = ast.actions[0]
+        assert action.cases[0].outputs == []
+
+    def test_multiple_cases_grouped_by_name(self):
+        src = """
+concept Password [U]
+
+  purpose
+    store credentials
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+    set [ user: U ; password: string ] => [ error: string ]
+"""
+        ast = parse_concept_source(src)
+        assert len(ast.actions) == 1
+        set_action = ast.actions[0]
+        assert set_action.name == "set"
+        assert len(set_action.cases) == 2
+        assert set_action.cases[0].outputs[0].name == "user"
+        assert set_action.cases[1].outputs[0].name == "error"
