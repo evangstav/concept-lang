@@ -19,6 +19,7 @@ from concept_lang.ast import (
     Triple,
     TypedName,
     WhereClause,
+    Workspace,
 )
 
 
@@ -201,3 +202,21 @@ class TestWhereClauseStateQuery:
             is_optional=True,
         )
         assert q.is_optional is True
+
+
+class TestWorkspace:
+    def test_empty_workspace(self):
+        ws = Workspace(concepts={}, syncs={})
+        assert ws.concepts == {}
+        assert ws.syncs == {}
+
+    def test_workspace_lookup(self):
+        # Reuse fixtures from TestConceptAST and TestSyncAST
+        password = TestConceptAST()._make_password_concept()
+        register = TestSyncAST()._make_register_sync()
+        ws = Workspace(
+            concepts={"Password": password},
+            syncs={"RegisterUser": register},
+        )
+        assert ws.concepts["Password"].purpose.startswith("to securely")
+        assert ws.syncs["RegisterUser"].when[0].concept == "Web"

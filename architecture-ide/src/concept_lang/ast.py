@@ -160,3 +160,18 @@ class SyncAST(BaseModel):
     where: WhereClause | None = None
     then: list[ActionPattern]
     source: str
+
+
+# --- Workspace -------------------------------------------------------------
+
+
+class Workspace(BaseModel):
+    """
+    A loaded collection of concepts and syncs — the central value that
+    every MCP tool operates on.
+
+    Apps (from the existing `*.app` format) are deferred: they keep
+    using the v1 types until P4 migrates them.
+    """
+    concepts: dict[str, "ConceptAST"] = {}
+    syncs: dict[str, "SyncAST"] = {}
