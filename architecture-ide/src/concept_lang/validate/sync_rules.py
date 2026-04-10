@@ -112,3 +112,77 @@ def rule_s2_pattern_fields_exist(
                 )
             )
     return diagnostics
+
+
+def _vars_in_pattern(pattern: ActionPattern) -> set[str]:
+    """Return the set of `?var` tokens that appear in an action pattern."""
+    seen: set[str] = set()
+    for pf in list(pattern.input_pattern) + list(pattern.output_pattern):
+        if pf.kind == "var":
+            seen.add(pf.value)
+    return seen
+
+
+def _bindings_from_when(sync: SyncAST) -> set[str]:
+    """Variables bound by any `when` pattern (both inputs and outputs)."""
+    bound: set[str] = set()
+    for pattern in sync.when:
+        bound |= _vars_in_pattern(pattern)
+    return bound
+
+
+def _bindings_from_where(sync: SyncAST) -> set[str]:
+    """
+    Variables introduced by the `where` clause:
+      - each `bind (expr as ?var)` introduces `?var`
+      - each state query triple binds its subject + object `?var` tokens
+    """
+    bound: set[str] = set()
+    if sync.where is None:
+        return bound
+    for bind in sync.where.binds:
+        bound.add(bind.variable)
+    for query in sync.where.queries:
+        for triple in query.triples:
+            if triple.subject.startswith("?"):
+                bound.add(triple.subject)
+            if triple.object.startswith("?"):
+                bound.add(triple.object)
+    return bound
+
+
+def rule_s3_then_vars_bound(
+    sync: SyncAST,
+    index: WorkspaceIndex,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    S3: Every `?var` used in `then` is bound in `when` or `where`.
+
+    The `index` argument is unused for this rule - it is kept in the
+    signature so every sync rule has a uniform shape that
+    `validate_workspace` can dispatch uniformly.
+    """
+    _ = index  # unused; kept for signature uniformity
+    bound: set[str] = _bindings_from_when(sync) | _bindings_from_where(sync)
+    diagnostics: list[Diagnostic] = []
+    for pattern in sync.then:
+        for var in _vars_in_pattern(pattern):
+            if var in bound:
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    severity="error",
+                    file=file,
+                    line=None,
+                    column=None,
+                    code="S3",
+                    message=(
+                        f"sync '{sync.name}' then clause references "
+                        f"unbound variable '{var}' (bind it in `when` or "
+                        f"in a `where` bind/state query)"
+                    ),
+                )
+            )
+    return diagnostics

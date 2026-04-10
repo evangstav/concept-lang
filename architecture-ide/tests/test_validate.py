@@ -295,3 +295,58 @@ sync BadSync
         )
         diags = rule_s2_pattern_fields_exist(sync, idx)
         assert diags == []
+
+
+from concept_lang.validate import rule_s3_then_vars_bound
+
+
+class TestRuleS3:
+    def _index(self) -> WorkspaceIndex:
+        return WorkspaceIndex.build(_workspace_with_counter_and_log())
+
+    def test_vars_bound_in_when_are_allowed(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync LogEveryInc
+
+  when
+    Counter/inc: [ amount: ?amount ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        assert rule_s3_then_vars_bound(sync, idx) == []
+
+    def test_var_bound_in_where_bind_is_allowed(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync BindThenUse
+
+  when
+    Counter/inc: [ ] => [ ]
+  where
+    bind (uuid() as ?entry)
+  then
+    Log/append: [ event: ?entry ]
+"""
+        )
+        assert rule_s3_then_vars_bound(sync, idx) == []
+
+    def test_unbound_var_in_then_is_flagged(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync Bad
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?mystery ]
+"""
+        )
+        diags = rule_s3_then_vars_bound(sync, idx)
+        assert len(diags) == 1
+        assert diags[0].code == "S3"
+        assert "?mystery" in diags[0].message

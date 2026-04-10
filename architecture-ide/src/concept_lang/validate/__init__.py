@@ -15,10 +15,12 @@ from concept_lang.validate.diagnostic import Diagnostic
 from concept_lang.validate.sync_rules import (
     rule_s1_references_resolve,
     rule_s2_pattern_fields_exist,
+    rule_s3_then_vars_bound,
 )
 
 __all__ = [
     "Diagnostic",
     "rule_s1_references_resolve",
     "rule_s2_pattern_fields_exist",
+    "rule_s3_then_vars_bound",
 ]
