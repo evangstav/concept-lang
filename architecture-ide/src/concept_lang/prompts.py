@@ -73,7 +73,7 @@ Use the `read_concept` tool to load each one, then evaluate:
 
 For each issue found, suggest a specific improvement to the `.concept` source.
 
-Also use `get_dependency_graph` to render the overall concept map and check for unexpected coupling.""",
+Also use `get_workspace_graph` to render the overall concept map (nodes are concepts, edges are syncs) and check for unexpected coupling.""",
                 },
             }
         ]
