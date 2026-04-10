@@ -116,3 +116,95 @@ class TestWorkspaceIndex:
         # Union of all input + output field names across all cases of the action.
         names = idx.action_field_names("Counter", "inc")
         assert names == {"amount", "total"}
+
+
+from concept_lang.parse import parse_concept_source
+from concept_lang.validate import rule_c1_state_independence
+
+
+class TestRuleC1:
+    def test_own_type_param_is_allowed(self):
+        src = """
+concept Box [T]
+
+  purpose
+    store things
+
+  state
+    items: set T
+
+  actions
+    add [ item: T ] => [ box: Box ]
+
+  operational principle
+    after add [ item: x ] => [ box: b ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c1_state_independence(ast)
+        assert diags == []
+
+    def test_primitive_types_are_allowed(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+    label: string
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c1_state_independence(ast)
+        assert diags == []
+
+    def test_foreign_concept_is_flagged(self):
+        src = """
+concept Basket
+
+  purpose
+    hold user items
+
+  state
+    owner: User
+
+  actions
+    add [ item: string ] => [ basket: Basket ]
+
+  operational principle
+    after add [ item: "apple" ] => [ basket: b ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c1_state_independence(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C1"
+        assert diags[0].severity == "error"
+        assert "User" in diags[0].message
+
+    def test_relation_with_foreign_on_either_side(self):
+        src = """
+concept Assignment
+
+  purpose
+    assign tasks to people
+
+  state
+    assigned: Task -> Person
+
+  actions
+    assign [ task: string ; person: string ] => [ assignment: Assignment ]
+
+  operational principle
+    after assign [ task: "t" ; person: "p" ] => [ assignment: a ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c1_state_independence(ast)
+        codes = [d.code for d in diags]
+        # Both Task and Person should be flagged - the rule reports each.
+        assert codes.count("C1") == 2

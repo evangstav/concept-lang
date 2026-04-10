@@ -458,8 +458,16 @@ class TestP1Gate:
     FIXTURES_ROOT = Path(__file__).parent / "fixtures"
 
     def test_all_positive_fixtures_parse(self):
-        concept_files = sorted(self.FIXTURES_ROOT.rglob("*.concept"))
-        sync_files = sorted(self.FIXTURES_ROOT.rglob("*.sync"))
+        # Exclude the P2 `negative/` fixture directory; positive fixtures
+        # live under `architecture_ide/` and `realworld/`.
+        concept_files = sorted(
+            f for f in self.FIXTURES_ROOT.rglob("*.concept")
+            if "negative" not in f.parts
+        )
+        sync_files = sorted(
+            f for f in self.FIXTURES_ROOT.rglob("*.sync")
+            if "negative" not in f.parts
+        )
 
         # Expected totals: 4 (architecture_ide) + 6 (realworld) concepts; 3 + 6 syncs.
         assert len(concept_files) == 10, f"Found {len(concept_files)} concept files"
