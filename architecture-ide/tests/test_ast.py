@@ -6,12 +6,19 @@ from pydantic import ValidationError
 from concept_lang.ast import (
     Action,
     ActionCase,
+    ActionPattern,
+    BindClause,
     ConceptAST,
     EffectClause,
     OPStep,
     OperationalPrinciple,
+    PatternField,
     StateDecl,
+    StateQuery,
+    SyncAST,
+    Triple,
     TypedName,
+    WhereClause,
 )
 
 
@@ -125,3 +132,72 @@ class TestConceptAST:
         error_case = next(c for c in set_action.cases
                           if any(o.name == "error" for o in c.outputs))
         assert error_case.outputs[0].type_expr == "string"
+
+
+class TestSyncAST:
+    def _make_register_sync(self) -> SyncAST:
+        web_request = ActionPattern(
+            concept="Web",
+            action="request",
+            input_pattern=[
+                PatternField(name="method", kind="literal", value='"register"'),
+                PatternField(name="username", kind="var", value="?username"),
+                PatternField(name="email", kind="var", value="?email"),
+            ],
+            output_pattern=[
+                PatternField(name="request", kind="var", value="?request"),
+            ],
+        )
+        return SyncAST(
+            name="RegisterUser",
+            when=[web_request],
+            where=WhereClause(
+                binds=[BindClause(expression="uuid()", variable="?user")],
+            ),
+            then=[
+                ActionPattern(
+                    concept="User",
+                    action="register",
+                    input_pattern=[
+                        PatternField(name="user", kind="var", value="?user"),
+                        PatternField(name="name", kind="var", value="?username"),
+                        PatternField(name="email", kind="var", value="?email"),
+                    ],
+                    output_pattern=[],
+                )
+            ],
+            source="",
+        )
+
+    def test_round_trip(self):
+        sync = self._make_register_sync()
+        dumped = sync.model_dump()
+        assert SyncAST.model_validate(dumped) == sync
+
+    def test_pattern_field_kind_literal(self):
+        sync = self._make_register_sync()
+        method = sync.when[0].input_pattern[0]
+        assert method.kind == "literal"
+        assert method.value == '"register"'
+
+
+class TestWhereClauseStateQuery:
+    def test_state_query_with_triples(self):
+        q = StateQuery(
+            concept="Article",
+            triples=[
+                Triple(subject="?article", predicate="title", object="?title"),
+                Triple(subject="?article", predicate="author", object="?author"),
+            ],
+        )
+        wc = WhereClause(queries=[q])
+        assert wc.queries[0].concept == "Article"
+        assert wc.queries[0].is_optional is False
+
+    def test_optional_state_query(self):
+        q = StateQuery(
+            concept="Tag",
+            triples=[Triple(subject="?article", predicate="tag", object="?tag")],
+            is_optional=True,
+        )
+        assert q.is_optional is True

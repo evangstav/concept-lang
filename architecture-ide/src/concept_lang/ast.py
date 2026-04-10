@@ -85,3 +85,78 @@ class ConceptAST(BaseModel):
     actions: list[Action]
     operational_principle: OperationalPrinciple
     source: str                       # raw source text for diagnostics
+
+
+# --- Sync ------------------------------------------------------------------
+
+
+class PatternField(BaseModel):
+    """
+    One field inside an action pattern's `[ ... ]` bracket.
+
+    Examples:
+        method: "register"    -> name="method", kind="literal", value='"register"'
+        username: ?username   -> name="username", kind="var",    value="?username"
+    """
+    name: str
+    kind: Literal["literal", "var"]
+    value: str
+
+
+class ActionPattern(BaseModel):
+    """
+    `Concept/action: [ input_pattern ] => [ output_pattern ]`
+
+    Used in a sync's `when` clause (as matches) and `then` clause
+    (as invocations). An empty pattern list means "match anything".
+    """
+    concept: str
+    action: str
+    input_pattern: list[PatternField]
+    output_pattern: list[PatternField]
+
+
+class Triple(BaseModel):
+    """One SPARQL-ish triple inside a state query."""
+    subject: str                      # e.g. "?article"
+    predicate: str                    # e.g. "title"
+    object: str                       # e.g. "?title"
+
+
+class StateQuery(BaseModel):
+    """
+    `Concept: { ?subject prop: ?obj ; prop: ?obj }`
+
+    Queries the state of a concept. `is_optional` marks it as a SPARQL
+    OPTIONAL (left-join); otherwise the query must match for the sync
+    to fire.
+    """
+    concept: str
+    triples: list[Triple]
+    is_optional: bool = False
+
+
+class BindClause(BaseModel):
+    """
+    `bind (<expression> as ?var)`
+
+    Introduces a computed variable. The expression is kept as raw
+    text; the runtime (Layer 2) will evaluate it.
+    """
+    expression: str
+    variable: str                     # e.g. "?user"
+
+
+class WhereClause(BaseModel):
+    """The `where` section of a sync: state queries and binds."""
+    queries: list[StateQuery] = []
+    binds: list[BindClause] = []
+
+
+class SyncAST(BaseModel):
+    """Top-level AST for a `.sync` file."""
+    name: str
+    when: list[ActionPattern]
+    where: WhereClause | None = None
+    then: list[ActionPattern]
+    source: str
