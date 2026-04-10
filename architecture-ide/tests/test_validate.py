@@ -1208,3 +1208,54 @@ class TestNegativeFixturesFireExpectedCodes:
         diags = validate_concept_file(fixture)
         errors = [d for d in diags if d.severity == "error"]
         assert errors == []
+
+
+class TestP2Gate:
+    """
+    The P2 gate from the paper-alignment spec:
+
+      1. Every positive fixture (architecture_ide + realworld) produces
+         zero error-level diagnostics.
+      2. Every negative fixture fires at least the codes declared in its
+         matching `*.expected.json`.
+      3. The realworld workspace is the paper's canonical case study; if
+         it validates clean, the validator is faithful to the paper.
+    """
+
+    def test_paper_case_study_is_accepted_by_validator(self):
+        ws, cf, sf = _load_fixture_workspace("realworld")
+        diags = validate_workspace(ws, concept_files=cf, sync_files=sf)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == [], (
+            "paper case study (realworld fixtures) produced errors:\n"
+            + "\n".join(f"  {d.code} ({d.file}): {d.message}" for d in errors)
+        )
+
+    def test_every_spec_rule_has_a_coverage_class(self):
+        """
+        Sanity check: every rule declared in spec §4.3 (except C8 and the
+        app-spec rules which stay in v1 for P2) has at least one test
+        class in this file.
+        """
+        import sys
+
+        this_module = sys.modules[__name__]
+
+        expected_class_names = {
+            "TestRuleC1",
+            "TestRuleC2",
+            "TestRuleC3",
+            "TestRuleC4",
+            "TestRuleC5",
+            "TestRuleC6",
+            "TestRuleC7",
+            "TestRuleC9",
+            "TestRuleS1",
+            "TestRuleS2",
+            "TestRuleS3",
+            "TestRuleS4",
+            "TestRuleS5",
+        }
+        present = {name for name in dir(this_module) if name.startswith("TestRule")}
+        missing = expected_class_names - present
+        assert not missing, f"missing coverage classes: {sorted(missing)}"
