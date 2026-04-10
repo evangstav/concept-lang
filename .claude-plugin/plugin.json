@@ -1,6 +1,6 @@
 {
   "name": "concept-lang",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Daniel Jackson-style concept design toolkit — build, review, scaffold, and explore concept specs via MCP",
   "author": {
     "name": "evangstav"
