@@ -1,0 +1,6 @@
+sync InternalOnly
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Counter/inc: [ amount: ?total ]
