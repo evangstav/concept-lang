@@ -484,3 +484,70 @@ class TestP1Gate:
             assert sync.name, f"{f}: empty name"
             assert sync.when, f"{f}: empty when"
             assert sync.then, f"{f}: empty then"
+
+
+class TestLarkPropagatePositions:
+    """
+    Pre-transformer sanity check: with propagate_positions=True, the raw
+    Lark parse tree must carry .meta.line / .meta.column on interior nodes.
+    This is the foundation for threading positions into the AST (Task 5/6).
+    """
+
+    def test_concept_parse_tree_has_meta_lines(self):
+        from concept_lang.grammars import read_grammar
+        from lark import Lark
+
+        src = (
+            "concept Counter\n"
+            "\n"
+            "  purpose\n"
+            "    count things\n"
+            "\n"
+            "  state\n"
+            "    total: int\n"
+            "\n"
+            "  actions\n"
+            "    inc [ ] => [ total: int ]\n"
+            "\n"
+            "  operational principle\n"
+            "    after inc [ ] => [ total: 1 ]\n"
+        )
+        parser = Lark(
+            read_grammar("concept.lark"),
+            parser="earley",
+            maybe_placeholders=False,
+            propagate_positions=True,
+        )
+        tree = parser.parse(src)
+        # `state_decl` starts at line 7 in the source above (1-indexed).
+        state_decl = next(
+            t for t in tree.iter_subtrees() if t.data == "state_decl"
+        )
+        assert state_decl.meta.line == 7
+        assert state_decl.meta.column >= 1
+
+    def test_sync_parse_tree_has_meta_lines(self):
+        from concept_lang.grammars import read_grammar
+        from lark import Lark
+
+        src = (
+            "sync LogInc\n"
+            "\n"
+            "  when\n"
+            "    Counter/inc: [ ] => [ total: ?total ]\n"
+            "  then\n"
+            "    Log/append: [ event: ?total ]\n"
+        )
+        parser = Lark(
+            read_grammar("sync.lark"),
+            parser="earley",
+            maybe_placeholders=False,
+            propagate_positions=True,
+        )
+        tree = parser.parse(src)
+        action_patterns = [
+            t for t in tree.iter_subtrees() if t.data == "action_pattern"
+        ]
+        assert action_patterns
+        # First `action_pattern` is under `when` on line 4.
+        assert action_patterns[0].meta.line == 4

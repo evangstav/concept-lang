@@ -25,6 +25,7 @@ def _get_concept_parser() -> Lark:
             read_grammar("concept.lark"),
             parser="earley",
             maybe_placeholders=False,
+            propagate_positions=True,
         )
     return _concept_parser
 
@@ -59,6 +60,7 @@ def _get_sync_parser() -> Lark:
             read_grammar("sync.lark"),
             parser="earley",
             maybe_placeholders=False,
+            propagate_positions=True,
         )
     return _sync_parser
 
