@@ -375,3 +375,57 @@ concept Counter
 """
         diags = rule_c4_no_inline_sync(src, file=None)
         assert diags == []
+
+
+from concept_lang.validate import rule_c5_has_purpose
+
+
+class TestRuleC5:
+    def test_non_empty_purpose_is_allowed(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c5_has_purpose(ast)
+        assert diags == []
+
+    def test_whitespace_only_purpose_is_flagged(self):
+        # We cannot easily construct this from the parser (the grammar
+        # requires at least one non-whitespace purpose line), so we
+        # hand-build the AST.
+        ast = ConceptAST(
+            name="Empty",
+            params=[],
+            purpose="   ",
+            state=[],
+            actions=[],
+            operational_principle=OperationalPrinciple(steps=[]),
+            source="",
+        )
+        diags = rule_c5_has_purpose(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C5"
+        assert diags[0].severity == "error"
+
+    def test_fully_empty_purpose_is_flagged(self):
+        ast = ConceptAST(
+            name="Empty",
+            params=[],
+            purpose="",
+            state=[],
+            actions=[],
+            operational_principle=OperationalPrinciple(steps=[]),
+            source="",
+        )
+        diags = rule_c5_has_purpose(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C5"

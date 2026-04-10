@@ -191,3 +191,25 @@ def rule_c4_no_inline_sync(
             )
         )
     return diagnostics
+
+
+def rule_c5_has_purpose(
+    concept: ConceptAST,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C5: Every concept has a non-empty `purpose`.
+    """
+    if concept.purpose and concept.purpose.strip():
+        return []
+    return [
+        Diagnostic(
+            severity="error",
+            file=file,
+            line=None,
+            column=None,
+            code="C5",
+            message=f"concept '{concept.name}' has an empty purpose",
+        )
+    ]

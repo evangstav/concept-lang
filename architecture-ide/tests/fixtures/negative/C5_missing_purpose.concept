@@ -1,0 +1,10 @@
+concept Empty
+
+  purpose
+    placeholder purpose text
+
+  actions
+    noop [ ] => [ ok: boolean ]
+
+  operational principle
+    after noop [ ] => [ ok: true ]
