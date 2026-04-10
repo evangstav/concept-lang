@@ -12,6 +12,7 @@ Public API (grows across the tasks of the P2 plan):
     rule_c4_no_inline_sync
     rule_c5_has_purpose
     rule_c6_has_actions
+    rule_c7_action_has_success_case
     validate_workspace
     validate_concept_file
     validate_sync_file
@@ -24,6 +25,7 @@ from concept_lang.validate.concept_rules import (
     rule_c4_no_inline_sync,
     rule_c5_has_purpose,
     rule_c6_has_actions,
+    rule_c7_action_has_success_case,
 )
 from concept_lang.validate.diagnostic import Diagnostic
 
@@ -35,4 +37,5 @@ __all__ = [
     "rule_c4_no_inline_sync",
     "rule_c5_has_purpose",
     "rule_c6_has_actions",
+    "rule_c7_action_has_success_case",
 ]

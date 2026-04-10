@@ -471,3 +471,48 @@ class TestRuleC6:
         assert len(diags) == 1
         assert diags[0].code == "C6"
         assert diags[0].severity == "error"
+
+
+from concept_lang.validate import rule_c7_action_has_success_case
+
+
+class TestRuleC7:
+    def test_success_and_error_is_allowed(self):
+        src = """
+concept Password [U]
+
+  purpose
+    store credentials
+
+  state
+    password: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+    set [ user: U ; password: string ] => [ error: string ]
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ user: x ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c7_action_has_success_case(ast)
+        assert diags == []
+
+    def test_only_error_case_is_flagged(self):
+        src = """
+concept Password [U]
+
+  purpose
+    store credentials
+
+  actions
+    set [ user: U ; password: string ] => [ error: string ]
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ error: "nope" ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c7_action_has_success_case(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C7"
+        assert "set" in diags[0].message

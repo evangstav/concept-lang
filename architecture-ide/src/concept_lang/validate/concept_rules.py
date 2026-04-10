@@ -235,3 +235,41 @@ def rule_c6_has_actions(
             message=f"concept '{concept.name}' has no actions",
         )
     ]
+
+
+def _is_error_case(case: ActionCase) -> bool:
+    """
+    An action case is considered an "error case" if any of its output
+    fields is literally named `error`. This matches the paper convention
+    shown on Password.set and User.register.
+    """
+    return any(out.name == "error" for out in case.outputs)
+
+
+def rule_c7_action_has_success_case(
+    concept: ConceptAST,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C7: Every action has at least one case with a non-error output.
+    """
+    diagnostics: list[Diagnostic] = []
+    for action in concept.actions:
+        if any(not _is_error_case(case) for case in action.cases):
+            continue
+        diagnostics.append(
+            Diagnostic(
+                severity="error",
+                file=file,
+                line=None,
+                column=None,
+                code="C7",
+                message=(
+                    f"action '{action.name}' on concept '{concept.name}' has "
+                    f"only error cases (every case's outputs include "
+                    f"'error') - add a non-error success case"
+                ),
+            )
+        )
+    return diagnostics
