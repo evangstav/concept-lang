@@ -1,0 +1,13 @@
+concept Logger
+
+  purpose
+    log events to an append-only list
+
+  state
+    entries: set string
+
+  actions
+    write [ msg: string ] => [ ]
+
+  operational principle
+    after write [ msg: "hello" ] => [ ]

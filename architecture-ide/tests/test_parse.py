@@ -458,15 +458,18 @@ class TestP1Gate:
     FIXTURES_ROOT = Path(__file__).parent / "fixtures"
 
     def test_all_positive_fixtures_parse(self):
-        # Exclude the P2 `negative/` fixture directory; positive fixtures
-        # live under `architecture_ide/` and `realworld/`.
+        # Exclude P2 `negative/` and P4 `mcp/` fixture trees; positive
+        # fixtures for this gate live only under `architecture_ide/` and
+        # `realworld/`. The `mcp/` fixtures are hand-curated tiny
+        # workspaces for MCP integration tests (clean + with_error +
+        # empty) and have their own gate inside test_mcp_tools.py.
         concept_files = sorted(
             f for f in self.FIXTURES_ROOT.rglob("*.concept")
-            if "negative" not in f.parts
+            if "negative" not in f.parts and "mcp" not in f.parts
         )
         sync_files = sorted(
             f for f in self.FIXTURES_ROOT.rglob("*.sync")
-            if "negative" not in f.parts
+            if "negative" not in f.parts and "mcp" not in f.parts
         )
 
         # Expected totals: 4 (architecture_ide) + 6 (realworld) concepts; 3 + 6 syncs.
