@@ -1178,22 +1178,44 @@ class TestNegativeFixturesFireExpectedCodes:
         for fixture in sorted(NEGATIVE_ROOT.glob("*.concept")):
             expected = _expected_for(fixture)
             diags = self._fire_concept_fixture(fixture)
-            emitted_codes = {(d.code, d.severity) for d in diags}
-            for want in expected["diagnostics"]:
-                key = (want["code"], want["severity"])
-                assert key in emitted_codes, (
-                    f"{fixture.name}: expected {key} in {sorted(emitted_codes)}"
-                )
+            self._assert_expected_in_diagnostics(fixture, expected, diags)
 
     def test_sync_negative_fixtures_fire_expected_codes(self):
         for fixture in sorted(NEGATIVE_ROOT.glob("*.sync")):
             expected = _expected_for(fixture)
             diags = self._fire_sync_fixture(fixture)
-            emitted_codes = {(d.code, d.severity) for d in diags}
-            for want in expected["diagnostics"]:
-                key = (want["code"], want["severity"])
-                assert key in emitted_codes, (
-                    f"{fixture.name}: expected {key} in {sorted(emitted_codes)}"
+            self._assert_expected_in_diagnostics(fixture, expected, diags)
+
+    def _assert_expected_in_diagnostics(
+        self,
+        fixture: Path,
+        expected: dict,
+        diags: list[Diagnostic],
+    ) -> None:
+        """
+        For each entry in ``expected['diagnostics']``, assert that at least
+        one emitted diagnostic matches its ``code`` + ``severity``, and - if
+        ``line`` is an integer - also matches that exact line. A ``line: null``
+        entry accepts any emitted line.
+        """
+        for want in expected["diagnostics"]:
+            code = want["code"]
+            severity = want["severity"]
+            want_line = want.get("line")
+            candidates = [
+                d for d in diags
+                if d.code == code and d.severity == severity
+            ]
+            assert candidates, (
+                f"{fixture.name}: expected ({code}, {severity}) "
+                f"in {[(d.code, d.severity) for d in diags]}"
+            )
+            if want_line is not None:
+                line_matched = [d for d in candidates if d.line == want_line]
+                assert line_matched, (
+                    f"{fixture.name}: expected ({code}, {severity}) "
+                    f"at line {want_line}, got lines "
+                    f"{sorted(d.line for d in candidates if d.line is not None)}"
                 )
 
     def test_c5_fixture_parses_clean_even_though_listed(self):
