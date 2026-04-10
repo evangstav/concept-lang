@@ -516,3 +516,39 @@ concept Password [U]
         assert len(diags) == 1
         assert diags[0].code == "C7"
         assert "set" in diags[0].message
+
+
+from concept_lang.validate import rule_c9_has_op_principle
+
+
+class TestRuleC9:
+    def test_non_empty_op_principle_is_allowed(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+"""
+        ast = parse_concept_source(src)
+        assert rule_c9_has_op_principle(ast) == []
+
+    def test_empty_op_principle_is_flagged(self):
+        ast = ConceptAST(
+            name="Counter",
+            params=[],
+            purpose="count things",
+            state=[],
+            actions=[],
+            operational_principle=OperationalPrinciple(steps=[]),
+            source="",
+        )
+        diags = rule_c9_has_op_principle(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C9"
+        assert diags[0].severity == "error"

@@ -273,3 +273,29 @@ def rule_c7_action_has_success_case(
             )
         )
     return diagnostics
+
+
+def rule_c9_has_op_principle(
+    concept: ConceptAST,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C9: Operational principle is required and has at least one step.
+    """
+    if concept.operational_principle.steps:
+        return []
+    return [
+        Diagnostic(
+            severity="error",
+            file=file,
+            line=None,
+            column=None,
+            code="C9",
+            message=(
+                f"concept '{concept.name}' has no operational principle steps "
+                f"- describe the archetypal scenario using the concept's own "
+                f"actions"
+            ),
+        )
+    ]

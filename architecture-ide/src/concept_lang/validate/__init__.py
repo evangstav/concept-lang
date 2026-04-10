@@ -13,6 +13,7 @@ Public API (grows across the tasks of the P2 plan):
     rule_c5_has_purpose
     rule_c6_has_actions
     rule_c7_action_has_success_case
+    rule_c9_has_op_principle
     validate_workspace
     validate_concept_file
     validate_sync_file
@@ -26,6 +27,7 @@ from concept_lang.validate.concept_rules import (
     rule_c5_has_purpose,
     rule_c6_has_actions,
     rule_c7_action_has_success_case,
+    rule_c9_has_op_principle,
 )
 from concept_lang.validate.diagnostic import Diagnostic
 
@@ -38,4 +40,5 @@ __all__ = [
     "rule_c5_has_purpose",
     "rule_c6_has_actions",
     "rule_c7_action_has_success_case",
+    "rule_c9_has_op_principle",
 ]
