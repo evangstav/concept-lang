@@ -110,3 +110,115 @@ class TestLoadWorkspaceHappyPath:
         ws, diags = load_workspace(tmp_path)
         assert diags == []
         assert "DeepSync" in ws.syncs
+
+
+class TestLoadWorkspaceErrors:
+    def test_bad_concept_still_loads_the_good_ones(self):
+        ws, diags = load_workspace(FIXTURES_ROOT / "negative" / "loader" / "bad_concept")
+        # Counter parses fine, Broken does not.
+        assert "Counter" in ws.concepts
+        assert "Broken" not in ws.concepts
+        # The sync still loads because the broken concept did not short-circuit us.
+        assert "LogInc" in ws.syncs
+        # One P0 diagnostic for Broken.concept.
+        p0s = [d for d in diags if d.code == "P0"]
+        assert len(p0s) == 1
+        assert p0s[0].severity == "error"
+        assert p0s[0].file is not None
+        assert p0s[0].file.name == "Broken.concept"
+        # Line is surfaced from the Lark exception (best-effort).
+        assert p0s[0].line is not None
+
+    def test_empty_workspace_has_no_diagnostics(self):
+        ws, diags = load_workspace(FIXTURES_ROOT / "negative" / "loader" / "empty")
+        assert ws.concepts == {}
+        assert ws.syncs == {}
+        assert diags == []
+
+    def test_missing_root_returns_l0_diagnostic(self, tmp_path):
+        missing = tmp_path / "does_not_exist"
+        ws, diags = load_workspace(missing)
+        assert ws.concepts == {}
+        assert ws.syncs == {}
+        assert len(diags) == 1
+        assert diags[0].code == "L0"
+        assert diags[0].severity == "error"
+        assert diags[0].file == missing
+
+    def test_missing_concepts_dir_is_ok(self, tmp_path):
+        # Root exists, syncs/ exists, concepts/ does not — that's a valid
+        # "syncs only" workspace and should not produce a diagnostic.
+        (tmp_path / "syncs").mkdir()
+        (tmp_path / "syncs" / "x.sync").write_text(
+            "sync X\n\n  when\n    A/do: [ ] => [ ]\n  then\n    B/do: [ ] => [ ]\n",
+            encoding="utf-8",
+        )
+        ws, diags = load_workspace(tmp_path)
+        assert ws.concepts == {}
+        assert "X" in ws.syncs
+        assert diags == []
+
+    def test_missing_syncs_dir_is_ok(self, tmp_path):
+        (tmp_path / "concepts").mkdir()
+        (tmp_path / "concepts" / "Tiny.concept").write_text(
+            (
+                "concept Tiny\n"
+                "\n"
+                "  purpose\n"
+                "    tiny thing\n"
+                "\n"
+                "  actions\n"
+                "    noop [ ] => [ ok: boolean ]\n"
+                "      do nothing\n"
+                "\n"
+                "  operational principle\n"
+                "    after noop [ ] => [ ok: true ]\n"
+            ),
+            encoding="utf-8",
+        )
+        ws, diags = load_workspace(tmp_path)
+        assert "Tiny" in ws.concepts
+        assert ws.syncs == {}
+        assert diags == []
+
+    def test_broken_sync_produces_p0_and_does_not_hide_concept(self, tmp_path):
+        (tmp_path / "concepts").mkdir()
+        (tmp_path / "concepts" / "Counter.concept").write_text(
+            (
+                "concept Counter\n"
+                "\n"
+                "  purpose\n"
+                "    count things\n"
+                "\n"
+                "  state\n"
+                "    total: int\n"
+                "\n"
+                "  actions\n"
+                "    inc [ ] => [ total: int ]\n"
+                "      add one to total\n"
+                "\n"
+                "  operational principle\n"
+                "    after inc [ ] => [ total: 1 ]\n"
+            ),
+            encoding="utf-8",
+        )
+        (tmp_path / "syncs").mkdir()
+        (tmp_path / "syncs" / "broken.sync").write_text(
+            "sync Broken\n  this is nonsense\n",
+            encoding="utf-8",
+        )
+        ws, diags = load_workspace(tmp_path)
+        assert "Counter" in ws.concepts
+        assert ws.syncs == {}
+        assert len(diags) == 1
+        assert diags[0].code == "P0"
+        assert diags[0].file is not None
+        assert diags[0].file.name == "broken.sync"
+        assert diags[0].line is not None
+
+    def test_empty_root_directory_is_clean(self, tmp_path):
+        # Root exists but contains neither concepts/ nor syncs/.
+        ws, diags = load_workspace(tmp_path)
+        assert ws.concepts == {}
+        assert ws.syncs == {}
+        assert diags == []

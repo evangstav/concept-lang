@@ -1,0 +1,6 @@
+sync LogInc
+
+  when
+    Counter/inc: [ n: ?n ] => [ total: ?t ]
+  then
+    Log/append: [ event: ?n ]
