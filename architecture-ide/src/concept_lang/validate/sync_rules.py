@@ -81,14 +81,24 @@ def rule_s2_pattern_fields_exist(
     file: Path | None = None,
 ) -> list[Diagnostic]:
     """
-    S2: Input/output pattern field names referenced in an action pattern
-    must exist in at least one case of that action's signature.
+    S2: Pattern field names in a `then` action invocation must exist in at
+    least one case of that action's signature.
 
-    An unknown action is silently ignored here - S1 handles that.
+    Scope is deliberately limited to `then` patterns. In the paper's
+    structural pattern (Meng & Jackson 2025 §5), `then` patterns are
+    actual action invocations that must satisfy the action's declared
+    signature, while `when` patterns are observations of completed
+    actions that may legitimately carry *extension fields* — additional
+    key/value pairs extracted by gateway concepts like `Web` from the
+    underlying event (e.g., HTTP request body keys). A strict S2 over
+    `when` would reject the paper's own `Web/request: [ method: "register"
+    ; username: ?u ; email: ?e ]` idiom, which is wrong.
+
+    An unknown action is silently ignored here — S1 handles that.
     An empty pattern list matches anything, so empty patterns never fire.
     """
     diagnostics: list[Diagnostic] = []
-    for section, pattern in _iter_patterns(sync):
+    for pattern in sync.then:
         cases = index.action_cases(pattern.concept, pattern.action)
         if cases is None:
             continue  # handled by S1
@@ -104,7 +114,7 @@ def rule_s2_pattern_fields_exist(
                     column=None,
                     code="S2",
                     message=(
-                        f"sync '{sync.name}' {section} pattern "
+                        f"sync '{sync.name}' then pattern "
                         f"'{pattern.concept}/{pattern.action}' references "
                         f"unknown field '{pf.name}' (declared fields: "
                         f"{sorted(allowed)!r})"

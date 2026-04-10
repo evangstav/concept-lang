@@ -699,7 +699,9 @@ sync LogEveryInc
         diags = rule_s2_pattern_fields_exist(sync, idx)
         assert diags == []
 
-    def test_unknown_input_field_is_flagged(self):
+    def test_unknown_then_field_is_flagged(self):
+        # S2 is scoped to `then` patterns (actual action invocations). A
+        # `then` pattern that references an undeclared field fires S2.
         ws = _workspace_with_counter_and_log()
         idx = WorkspaceIndex.build(ws)
         sync = parse_sync_source(
@@ -707,15 +709,37 @@ sync LogEveryInc
 sync BadSync
 
   when
-    Counter/inc: [ bogus: ?bogus ] => [ total: ?total ]
+    Counter/inc: [ ] => [ total: ?total ]
   then
-    Log/append: [ event: ?total ]
+    Log/append: [ bogus: ?total ]
 """
         )
         diags = rule_s2_pattern_fields_exist(sync, idx)
         assert len(diags) == 1
         assert diags[0].code == "S2"
         assert "bogus" in diags[0].message
+
+    def test_when_pattern_extension_is_allowed(self):
+        # In the paper's structural pattern, `when` patterns may extract
+        # additional gateway-observed fields from the matched event (e.g.,
+        # HTTP body keys on `Web/request`). S2 must NOT fire on such
+        # extension fields, since the action signature represents only the
+        # concept's independent interface — not every field the sync
+        # author may want to destructure from the event.
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync ExtractExtraFields
+
+  when
+    Counter/inc: [ extension_field: ?x ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        diags = rule_s2_pattern_fields_exist(sync, idx)
+        assert diags == []
 
     def test_empty_pattern_always_allowed(self):
         ws = _workspace_with_counter_and_log()
