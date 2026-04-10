@@ -1130,3 +1130,81 @@ class TestPositiveFixturesHaveNoErrors:
             "realworld fixtures produced error diagnostics:\n"
             + "\n".join(f"  {d.code} ({d.file}): {d.message}" for d in errors)
         )
+
+
+import json
+
+
+NEGATIVE_ROOT = FIXTURES_ROOT / "negative"
+
+
+def _expected_for(fixture_path: Path) -> dict:
+    """Load the matching `*.expected.json` file for a negative fixture."""
+    expected_path = NEGATIVE_ROOT / f"{fixture_path.stem}.expected.json"
+    return json.loads(expected_path.read_text(encoding="utf-8"))
+
+
+def _shared_concepts_for_sync_negatives() -> dict[str, ConceptAST]:
+    """
+    A small concept pool that gives the negative sync fixtures something
+    to resolve against. We reuse the in-memory Counter + Log concepts
+    from the earlier sync tests so that S2 etc. have real signatures.
+    """
+    ws = _workspace_with_counter_and_log()
+    return dict(ws.concepts)
+
+
+class TestNegativeFixturesFireExpectedCodes:
+    def _fire_concept_fixture(self, path: Path) -> list[Diagnostic]:
+        return validate_concept_file(path)
+
+    def _fire_sync_fixture(self, path: Path) -> list[Diagnostic]:
+        return validate_sync_file(
+            path,
+            extra_concepts=_shared_concepts_for_sync_negatives(),
+        )
+
+    def test_every_negative_fixture_has_an_expected_file(self):
+        concept_fixtures = sorted(NEGATIVE_ROOT.glob("*.concept"))
+        sync_fixtures = sorted(NEGATIVE_ROOT.glob("*.sync"))
+        # Spec §6.2 lists 13 negative fixtures (C1..C9 except C8, S1..S5).
+        assert len(concept_fixtures) == 8, [p.name for p in concept_fixtures]
+        assert len(sync_fixtures) == 5, [p.name for p in sync_fixtures]
+        for p in concept_fixtures + sync_fixtures:
+            expected_path = NEGATIVE_ROOT / f"{p.stem}.expected.json"
+            assert expected_path.exists(), f"missing expected file for {p.name}"
+
+    def test_concept_negative_fixtures_fire_expected_codes(self):
+        for fixture in sorted(NEGATIVE_ROOT.glob("*.concept")):
+            expected = _expected_for(fixture)
+            diags = self._fire_concept_fixture(fixture)
+            emitted_codes = {(d.code, d.severity) for d in diags}
+            for want in expected["diagnostics"]:
+                key = (want["code"], want["severity"])
+                assert key in emitted_codes, (
+                    f"{fixture.name}: expected {key} in {sorted(emitted_codes)}"
+                )
+
+    def test_sync_negative_fixtures_fire_expected_codes(self):
+        for fixture in sorted(NEGATIVE_ROOT.glob("*.sync")):
+            expected = _expected_for(fixture)
+            diags = self._fire_sync_fixture(fixture)
+            emitted_codes = {(d.code, d.severity) for d in diags}
+            for want in expected["diagnostics"]:
+                key = (want["code"], want["severity"])
+                assert key in emitted_codes, (
+                    f"{fixture.name}: expected {key} in {sorted(emitted_codes)}"
+                )
+
+    def test_c5_fixture_parses_clean_even_though_listed(self):
+        """
+        C5's negative fixture is a minimal-but-valid concept - we
+        deliberately keep C5 AST-level only because the grammar requires a
+        non-whitespace purpose body. Assert that the fixture produces
+        zero error-level diagnostics (the expected file says
+        `"diagnostics": []`).
+        """
+        fixture = NEGATIVE_ROOT / "C5_missing_purpose.concept"
+        diags = validate_concept_file(fixture)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == []
