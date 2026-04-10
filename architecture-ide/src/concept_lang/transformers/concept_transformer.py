@@ -5,6 +5,7 @@ from lark import Token, Transformer, v_args
 from concept_lang.ast import (
     ConceptAST,
     OperationalPrinciple,
+    StateDecl,
 )
 
 
@@ -25,6 +26,9 @@ class ConceptTransformer(Transformer):
     def PURPOSE_LINE(self, token: Token) -> str:
         return str(token).strip()
 
+    def TYPE_EXPR(self, token: Token) -> str:
+        return str(token).strip()
+
     # --- sections ------------------------------------------------------------
 
     def type_params(self, *names: str) -> list[str]:
@@ -36,22 +40,32 @@ class ConceptTransformer(Transformer):
     def purpose_section(self, body: str) -> str:
         return body
 
+    def state_decl(self, name: str, type_expr: str) -> StateDecl:
+        return StateDecl(name=name, type_expr=type_expr)
+
+    def state_section(self, *decls: StateDecl) -> list[StateDecl]:
+        return list(decls)
+
     # --- top level -----------------------------------------------------------
 
     def concept_def(self, name: str, *rest) -> ConceptAST:
-        # rest may start with a type_params list; purpose is last
         params: list[str] = []
         purpose: str = ""
+        state: list[StateDecl] = []
         for item in rest:
-            if isinstance(item, list):
-                params = item
+            if isinstance(item, list) and item:
+                head = item[0]
+                if isinstance(head, str):
+                    params = item
+                elif isinstance(head, StateDecl):
+                    state = item
             elif isinstance(item, str):
                 purpose = item
         return ConceptAST(
             name=name,
             params=params,
             purpose=purpose,
-            state=[],
+            state=state,
             actions=[],
             operational_principle=OperationalPrinciple(steps=[]),
             source="",

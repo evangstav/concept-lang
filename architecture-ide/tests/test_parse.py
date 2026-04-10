@@ -63,3 +63,36 @@ concept Journal
         assert "actions the user performed" in ast.purpose
         assert "effects" in ast.purpose
         assert "operational decision" in ast.purpose
+
+
+class TestConceptState:
+    def test_simple_set(self):
+        src = """
+concept Tracker
+
+  purpose
+    track items that are currently active
+
+  state
+    active: set Item
+"""
+        ast = parse_concept_source(src)
+        assert len(ast.state) == 1
+        assert ast.state[0].name == "active"
+        assert ast.state[0].type_expr == "set Item"
+
+    def test_relation(self):
+        src = """
+concept Password [U]
+
+  purpose
+    store credentials
+
+  state
+    password: U -> string
+    salt: U -> string
+"""
+        ast = parse_concept_source(src)
+        assert len(ast.state) == 2
+        assert ast.state[1].name == "salt"
+        assert ast.state[1].type_expr == "U -> string"
