@@ -8,6 +8,7 @@ used by the MCP tool path.
 from pathlib import Path
 
 from concept_lang.ast import ConceptAST, SyncAST, Workspace
+from concept_lang.parse import parse_concept_file, parse_sync_file
 from concept_lang.validate.concept_rules import (
     rule_c1_state_independence,
     rule_c2_effects_independence,
@@ -69,4 +70,83 @@ def validate_workspace(
         diagnostics.extend(rule_s4_where_vars_bound(sync, index, file=file))
         diagnostics.extend(rule_s5_multiple_concepts(sync, index, file=file))
 
+    return diagnostics
+
+
+def validate_concept_file(path: Path) -> list[Diagnostic]:
+    """
+    Validate a single `.concept` file.
+
+    Runs every concept rule (C1..C9 except C8) on the parsed AST plus the
+    source-level C4 scan. Returns all diagnostics with `file=path`.
+    """
+    source = path.read_text(encoding="utf-8")
+    diagnostics: list[Diagnostic] = []
+    # C4 first - it reports migration errors even if the file would
+    # otherwise parse. We then try to parse.
+    diagnostics.extend(rule_c4_no_inline_sync(source, file=path))
+
+    try:
+        concept = parse_concept_file(path)
+    except Exception as exc:
+        diagnostics.append(
+            Diagnostic(
+                severity="error",
+                file=path,
+                line=None,
+                column=None,
+                code="P0",
+                message=f"parse error: {exc}",
+            )
+        )
+        return diagnostics
+
+    diagnostics.extend(rule_c1_state_independence(concept, file=path))
+    diagnostics.extend(rule_c2_effects_independence(concept, file=path))
+    diagnostics.extend(rule_c3_op_principle_independence(concept, file=path))
+    diagnostics.extend(rule_c5_has_purpose(concept, file=path))
+    diagnostics.extend(rule_c6_has_actions(concept, file=path))
+    diagnostics.extend(rule_c7_action_has_success_case(concept, file=path))
+    diagnostics.extend(rule_c9_has_op_principle(concept, file=path))
+    return diagnostics
+
+
+def validate_sync_file(
+    path: Path,
+    *,
+    extra_concepts: dict[str, ConceptAST] | None = None,
+) -> list[Diagnostic]:
+    """
+    Validate a single `.sync` file.
+
+    When `extra_concepts` is provided, cross-reference rules (S1, S2)
+    resolve against that dictionary. Otherwise the sync is validated in
+    isolation and every cross-reference is flagged as unknown.
+    """
+    diagnostics: list[Diagnostic] = []
+    try:
+        sync = parse_sync_file(path)
+    except Exception as exc:
+        diagnostics.append(
+            Diagnostic(
+                severity="error",
+                file=path,
+                line=None,
+                column=None,
+                code="P0",
+                message=f"parse error: {exc}",
+            )
+        )
+        return diagnostics
+
+    scratch_ws = Workspace(
+        concepts=dict(extra_concepts or {}),
+        syncs={sync.name: sync},
+    )
+    index = WorkspaceIndex.build(scratch_ws)
+    diagnostics.extend(rule_s1_references_resolve(sync, index, file=path))
+    diagnostics.extend(rule_s2_pattern_fields_exist(sync, index, file=path))
+    diagnostics.extend(rule_s3_then_vars_bound(sync, index, file=path))
+    diagnostics.extend(rule_s4_where_vars_bound(sync, index, file=path))
+    diagnostics.extend(rule_s5_multiple_concepts(sync, index, file=path))
     return diagnostics

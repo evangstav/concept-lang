@@ -959,3 +959,94 @@ sync Broken
         diags = validate_workspace(ws)
         codes = {d.code for d in diags if d.severity == "error"}
         assert "S1" in codes
+
+
+from concept_lang.validate import validate_concept_file, validate_sync_file
+
+
+class TestSingleFileValidators:
+    def test_validate_concept_file_clean(self, tmp_path):
+        p = tmp_path / "Counter.concept"
+        p.write_text(
+            """
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+""",
+            encoding="utf-8",
+        )
+        diags = validate_concept_file(p)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == []
+
+    def test_validate_concept_file_dirty(self, tmp_path):
+        p = tmp_path / "Bad.concept"
+        p.write_text(
+            """
+concept Bad
+
+  purpose
+    bad
+
+  state
+    owner: User
+
+  actions
+    noop [ ] => [ ok: boolean ]
+
+  operational principle
+    after noop [ ] => [ ok: true ]
+""",
+            encoding="utf-8",
+        )
+        diags = validate_concept_file(p)
+        codes = {d.code for d in diags if d.severity == "error"}
+        assert "C1" in codes
+        # Every emitted diagnostic carries the file path.
+        assert all(d.file == p for d in diags)
+
+    def test_validate_sync_file_with_extra_concepts(self, tmp_path):
+        p = tmp_path / "log.sync"
+        p.write_text(
+            """
+sync LogEveryInc
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+""",
+            encoding="utf-8",
+        )
+        ws = _workspace_with_counter_and_log()
+        diags = validate_sync_file(p, extra_concepts=ws.concepts)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == []
+
+    def test_validate_sync_file_without_context_flags_unknown(self, tmp_path):
+        p = tmp_path / "log.sync"
+        p.write_text(
+            """
+sync LogEveryInc
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+""",
+            encoding="utf-8",
+        )
+        diags = validate_sync_file(p)
+        # Without extra_concepts, every reference is unknown -> S1 fires twice.
+        s1s = [d for d in diags if d.code == "S1"]
+        assert len(s1s) == 2
