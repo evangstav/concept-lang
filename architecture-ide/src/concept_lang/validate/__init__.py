@@ -12,5 +12,9 @@ Public API (grows across the tasks of the P2 plan):
 """
 
 from concept_lang.validate.diagnostic import Diagnostic
+from concept_lang.validate.sync_rules import rule_s1_references_resolve
 
-__all__ = ["Diagnostic"]
+__all__ = [
+    "Diagnostic",
+    "rule_s1_references_resolve",
+]

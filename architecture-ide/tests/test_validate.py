@@ -116,3 +116,109 @@ class TestWorkspaceIndex:
         # Union of all input + output field names across all cases of the action.
         names = idx.action_field_names("Counter", "inc")
         assert names == {"amount", "total"}
+
+
+# ---------------------------------------------------------------------------
+# Sync validator rules (S1..S5) — shared helpers and tests
+# ---------------------------------------------------------------------------
+
+from concept_lang.ast import SyncAST
+from concept_lang.parse import parse_sync_source
+from concept_lang.validate import rule_s1_references_resolve
+
+
+def _workspace_with_counter_and_log() -> Workspace:
+    counter = ConceptAST(
+        name="Counter",
+        params=[],
+        purpose="count things",
+        state=[StateDecl(name="total", type_expr="int")],
+        actions=[
+            Action(
+                name="inc",
+                cases=[
+                    ActionCase(
+                        inputs=[TypedName(name="amount", type_expr="int")],
+                        outputs=[TypedName(name="total", type_expr="int")],
+                    )
+                ],
+            )
+        ],
+        operational_principle=OperationalPrinciple(steps=[]),
+        source="",
+    )
+    log = ConceptAST(
+        name="Log",
+        params=[],
+        purpose="record events",
+        state=[],
+        actions=[
+            Action(
+                name="append",
+                cases=[
+                    ActionCase(
+                        inputs=[TypedName(name="event", type_expr="string")],
+                        outputs=[TypedName(name="entry", type_expr="string")],
+                    )
+                ],
+            )
+        ],
+        operational_principle=OperationalPrinciple(steps=[]),
+        source="",
+    )
+    return Workspace(concepts={"Counter": counter, "Log": log}, syncs={})
+
+
+class TestRuleS1:
+    def test_known_refs_are_allowed(self):
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync LogEveryInc
+
+  when
+    Counter/inc: [ amount: ?amount ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        diags = rule_s1_references_resolve(sync, idx)
+        assert diags == []
+
+    def test_unknown_concept_is_flagged(self):
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync BadSync
+
+  when
+    Counter/inc: [ amount: ?amount ] => [ total: ?total ]
+  then
+    Mailer/send: [ body: ?total ]
+"""
+        )
+        diags = rule_s1_references_resolve(sync, idx)
+        codes = [d.code for d in diags]
+        assert codes.count("S1") == 1
+        assert "Mailer" in diags[0].message
+
+    def test_unknown_action_on_known_concept_is_flagged(self):
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync BadSync
+
+  when
+    Counter/decrement: [ amount: ?amount ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        diags = rule_s1_references_resolve(sync, idx)
+        assert len(diags) == 1
+        assert diags[0].code == "S1"
+        assert "Counter" in diags[0].message
+        assert "decrement" in diags[0].message
