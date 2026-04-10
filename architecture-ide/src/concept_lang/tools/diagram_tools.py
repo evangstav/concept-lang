@@ -6,58 +6,10 @@ from mcp.server.fastmcp import FastMCP
 
 from concept_lang.ast import ConceptAST
 from concept_lang.diagrams import entity_diagram, state_machine
+from concept_lang.explorer import _to_v1_concept
 from concept_lang.parse import parse_concept_file
 
 from ._io import concepts_dir_for
-
-
-# TEMP STUB — replaced post-merge by import from concept_lang.explorer
-# Stream A's feat-p1-parser branch introduces `_to_v1_concept` as a
-# public adapter in `concept_lang.explorer`. This stub lets diagram_tools
-# stay functional on the P4 branch until that lands; at merge time the
-# local definition here is dropped in favour of the imported symbol.
-def _to_v1_concept(concept: ConceptAST):
-    """Convert a new-AST ConceptAST into a v1 ConceptAST shell for diagrams.
-
-    Only the fields consumed by `state_machine` and `entity_diagram`
-    (state/actions with pre/post clauses, name, params, purpose, source)
-    are populated. Action cases collapse into a single v1 action whose
-    `post.clauses` are built from the first case's effects.
-    """
-    from concept_lang.models import (
-        Action as V1Action,
-        ConceptAST as V1ConceptAST,
-        PrePost as V1PrePost,
-        StateDecl as V1StateDecl,
-    )
-
-    v1_state = [
-        V1StateDecl(name=decl.name, type_expr=decl.type_expr)
-        for decl in concept.state
-    ]
-
-    v1_actions: list[V1Action] = []
-    for action in concept.actions:
-        first_case = action.cases[0] if action.cases else None
-        params: list[str] = []
-        post_clauses: list[str] = []
-        if first_case is not None:
-            params = [f"{i.name}: {i.type_expr}" for i in first_case.inputs]
-            post_clauses = [e.raw for e in first_case.effects]
-        post = V1PrePost(clauses=post_clauses) if post_clauses else None
-        v1_actions.append(
-            V1Action(name=action.name, params=params, pre=None, post=post)
-        )
-
-    return V1ConceptAST(
-        name=concept.name,
-        params=list(concept.params),
-        purpose=concept.purpose,
-        state=v1_state,
-        actions=v1_actions,
-        sync=[],
-        source=concept.source,
-    )
 
 
 def register_diagram_tools(mcp: FastMCP, workspace_root: str) -> None:
