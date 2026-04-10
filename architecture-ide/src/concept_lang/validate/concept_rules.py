@@ -150,3 +150,44 @@ def rule_c3_op_principle_independence(
             )
         )
     return diagnostics
+
+
+# An indented `sync` section header line. We require leading whitespace
+# (section headers inside a concept are indented) followed by `sync` as a
+# whole word. This avoids matching identifiers like `resync`.
+_INLINE_SYNC_RE = re.compile(r"^[ \t]+sync\b", re.MULTILINE)
+
+
+def rule_c4_no_inline_sync(
+    source: str,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C4: Concepts may not contain an inline `sync` section.
+
+    In the new format syncs are top-level files. This rule exists to give
+    a clear error when migrating v1 concept files that still embed syncs
+    inside the concept body.
+
+    Operates on raw source text because a concept file containing an
+    inline `sync` section is not parseable by the new grammar - so the AST
+    path is unavailable.
+    """
+    diagnostics: list[Diagnostic] = []
+    for match in _INLINE_SYNC_RE.finditer(source):
+        line_no = source.count("\n", 0, match.start()) + 1
+        diagnostics.append(
+            Diagnostic(
+                severity="error",
+                file=file,
+                line=line_no,
+                column=None,
+                code="C4",
+                message=(
+                    "inline `sync` section is not allowed in concept files - "
+                    "move it to a top-level `.sync` file"
+                ),
+            )
+        )
+    return diagnostics

@@ -312,3 +312,66 @@ concept Counter
         assert len(diags) == 1
         assert diags[0].code == "C3"
         assert "sendEmail" in diags[0].message
+
+
+from concept_lang.validate import rule_c4_no_inline_sync
+
+
+class TestRuleC4:
+    def test_no_sync_section_is_clean(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+"""
+        diags = rule_c4_no_inline_sync(src, file=None)
+        assert diags == []
+
+    def test_inline_sync_section_is_flagged(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+
+  sync
+    when inc then log
+"""
+        diags = rule_c4_no_inline_sync(src, file=None)
+        assert len(diags) == 1
+        assert diags[0].code == "C4"
+        assert diags[0].severity == "error"
+        assert "top-level" in diags[0].message.lower()
+
+    def test_word_sync_inside_identifier_is_ignored(self):
+        # An action named "resync" should not trigger C4.
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  actions
+    resync [ ] => [ total: int ]
+"""
+        diags = rule_c4_no_inline_sync(src, file=None)
+        assert diags == []
