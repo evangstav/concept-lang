@@ -110,7 +110,7 @@ KNOWN_IGNORE_TOOLS: dict[str, set[str]] = {
 # (T3/build, T4/build-sync, T5/review, T6/scaffold, T7/explore) adds its
 # skill name to this set as it lands.
 # ---------------------------------------------------------------------------
-_REWRITTEN_SKILLS: set[str] = {"build"}
+_REWRITTEN_SKILLS: set[str] = {"build", "build-sync"}
 
 
 # Skills that are arg-free by design and exempt from the `argument-hint`
