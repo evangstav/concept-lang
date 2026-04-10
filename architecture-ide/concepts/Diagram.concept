@@ -1,0 +1,23 @@
+concept Diagram [Subject, Format]
+
+  purpose
+    produce a visual representation of a subject in a chosen output format
+
+  state
+    rendered: Subject -> Format
+
+  actions
+    render [ subject: Subject ; format: Format ] => [ subject: Subject ]
+      generate a diagram for the subject in the given format
+      effects:
+        rendered[subject] := format
+
+    invalidate [ subject: Subject ] => [ subject: Subject ]
+      drop the rendering so the next render call regenerates
+      effects:
+        rendered -= subject
+
+  operational principle
+    after render [ subject: s ; format: f ] => [ subject: s ]
+    then invalidate [ subject: s ] => [ subject: s ]
+    and render [ subject: s ; format: f ] => [ subject: s ]

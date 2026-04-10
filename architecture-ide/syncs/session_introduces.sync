@@ -1,0 +1,6 @@
+sync SessionIntroduces
+
+  when
+    DesignSession/start: [ topic: ?topic ; designer: ?designer ] => [ topic: ?topic ]
+  then
+    Concept/introduce: [ name: ?topic ]
