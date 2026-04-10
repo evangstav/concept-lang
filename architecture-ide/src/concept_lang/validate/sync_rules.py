@@ -9,14 +9,11 @@ AST nodes they flag: pattern-scoped rules (S1-S3) use the offending
 position, and S5 (sync-scoped warning) uses the `SyncAST`'s position.
 """
 
-import re
 from pathlib import Path
 
 from concept_lang.ast import ActionPattern, SyncAST
 from concept_lang.validate.diagnostic import Diagnostic
 from concept_lang.validate.helpers import WorkspaceIndex
-
-_VAR_RE = re.compile(r"\?[A-Za-z_][A-Za-z0-9_]*")
 
 
 def _iter_patterns(sync: SyncAST) -> list[tuple[str, ActionPattern]]:
