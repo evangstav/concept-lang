@@ -551,3 +551,75 @@ class TestLarkPropagatePositions:
         assert action_patterns
         # First `action_pattern` is under `when` on line 4.
         assert action_patterns[0].meta.line == 4
+
+
+class TestConceptTransformerPositions:
+    """
+    Position threading from Lark's meta into the ConceptAST. Every assertion
+    here pins one user-visible node to the specific source line it came from.
+    """
+
+    _SRC = (
+        "concept Counter\n"                        # line 1
+        "\n"                                         # line 2
+        "  purpose\n"                                # line 3
+        "    count things\n"                         # line 4
+        "\n"                                         # line 5
+        "  state\n"                                  # line 6
+        "    total: int\n"                           # line 7
+        "\n"                                         # line 8
+        "  actions\n"                                # line 9
+        "    inc [ n: int ] => [ total: int ]\n"    # line 10
+        "      add n to total\n"                     # line 11
+        "      effects:\n"                           # line 12
+        "        total := total + n\n"               # line 13
+        "\n"                                         # line 14
+        "  operational principle\n"                  # line 15
+        "    after inc [ n: 1 ] => [ total: 1 ]\n"  # line 16
+    )
+
+    def _parse(self):
+        return parse_concept_source(self._SRC)
+
+    def test_concept_ast_line_is_1(self):
+        ast = self._parse()
+        assert ast.line == 1
+        assert ast.column == 1
+
+    def test_state_decl_line_is_7(self):
+        ast = self._parse()
+        assert len(ast.state) == 1
+        assert ast.state[0].line == 7
+
+    def test_action_case_line_is_10(self):
+        ast = self._parse()
+        assert len(ast.actions) == 1
+        case = ast.actions[0].cases[0]
+        assert case.line == 10
+
+    def test_action_line_is_10(self):
+        ast = self._parse()
+        assert ast.actions[0].line == 10
+
+    def test_effect_clause_line_is_13(self):
+        ast = self._parse()
+        effects = ast.actions[0].cases[0].effects
+        assert len(effects) == 1
+        assert effects[0].line == 13
+
+    def test_op_step_line_is_16(self):
+        ast = self._parse()
+        assert ast.operational_principle.steps[0].line == 16
+
+    def test_operational_principle_line_is_15(self):
+        ast = self._parse()
+        # `operational principle` keyword starts on line 15.
+        assert ast.operational_principle.line == 15
+
+    def test_model_copy_preserves_positions(self):
+        # parse_concept_source ends with ast.model_copy(update={"source": source}).
+        # Pydantic model_copy should preserve fields not in `update`, but verify
+        # this explicitly so a future regression doesn't silently drop positions.
+        ast = self._parse()
+        assert ast.line is not None, "top-level line was clobbered by model_copy"
+        assert ast.state[0].line is not None, "nested line was clobbered by model_copy"

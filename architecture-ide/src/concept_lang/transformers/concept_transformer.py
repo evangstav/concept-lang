@@ -1,6 +1,7 @@
 """Transform a Lark parse tree for a .concept file into a ConceptAST."""
 
 from lark import Token, Transformer, v_args
+from lark.tree import Meta
 
 from concept_lang.ast import (
     Action,
@@ -12,6 +13,13 @@ from concept_lang.ast import (
     StateDecl,
     TypedName,
 )
+
+
+def _pos(meta: Meta) -> tuple[int | None, int | None]:
+    """Extract (line, column) from a Lark Meta, tolerating empty metas."""
+    if meta is None or meta.empty:
+        return (None, None)
+    return (meta.line, meta.column)
 
 
 @v_args(inline=True)
@@ -66,8 +74,10 @@ class ConceptTransformer(Transformer):
     def purpose_section(self, body: str) -> str:
         return body
 
-    def state_decl(self, name: str, type_expr: str) -> StateDecl:
-        return StateDecl(name=name, type_expr=type_expr)
+    @v_args(meta=True, inline=True)
+    def state_decl(self, meta: Meta, name: str, type_expr: str) -> StateDecl:
+        line, col = _pos(meta)
+        return StateDecl(name=name, type_expr=type_expr, line=line, column=col)
 
     def state_section(self, *decls: StateDecl) -> list[StateDecl]:
         return list(decls)
@@ -78,14 +88,20 @@ class ConceptTransformer(Transformer):
     def typed_name_list(self, *names: TypedName) -> list[TypedName]:
         return list(names)
 
-    def effect_line(self, field_ref: str, op: str, rhs: str) -> EffectClause:
+    @v_args(meta=True, inline=True)
+    def effect_line(
+        self, meta: Meta, field_ref: str, op: str, rhs: str
+    ) -> EffectClause:
         # field_ref might be "password[user]" — strip subscript for .field
         field_name = field_ref.split("[", 1)[0]
+        line, col = _pos(meta)
         return EffectClause(
             raw=f"{field_ref} {op} {rhs}",
             field=field_name,
             op=op,  # type: ignore[arg-type]
             rhs=rhs,
+            line=line,
+            column=col,
         )
 
     def effects_clause(self, *effects: EffectClause) -> list[EffectClause]:
@@ -101,7 +117,8 @@ class ConceptTransformer(Transformer):
                 effects = item  # single effects_clause result
         return body_lines, effects
 
-    def action_case(self, name: str, *rest) -> tuple[str, ActionCase]:
+    @v_args(meta=True, inline=True)
+    def action_case(self, meta: Meta, name: str, *rest) -> tuple[str, ActionCase]:
         inputs: list[TypedName] = []
         outputs: list[TypedName] = []
         body_lines: list[str] = []
@@ -122,22 +139,35 @@ class ConceptTransformer(Transformer):
         if tuple_args:
             body_lines, effects = tuple_args[0]
 
+        line, col = _pos(meta)
         return name, ActionCase(
             inputs=inputs,
             outputs=outputs,
             body=body_lines,
             effects=effects,
+            line=line,
+            column=col,
         )
 
     def actions_section(self, *cases: tuple[str, ActionCase]) -> list[Action]:
         grouped: dict[str, list[ActionCase]] = {}
         order: list[str] = []
+        first_pos: dict[str, tuple[int | None, int | None]] = {}
         for name, case in cases:
             if name not in grouped:
                 grouped[name] = []
                 order.append(name)
+                first_pos[name] = (case.line, case.column)
             grouped[name].append(case)
-        return [Action(name=n, cases=grouped[n]) for n in order]
+        return [
+            Action(
+                name=n,
+                cases=grouped[n],
+                line=first_pos[n][0],
+                column=first_pos[n][1],
+            )
+            for n in order
+        ]
 
     # --- operational principle ----------------------------------------------
 
@@ -151,7 +181,8 @@ class ConceptTransformer(Transformer):
     def op_arg_list(self, *args: tuple[str, str]) -> list[tuple[str, str]]:
         return list(args)
 
-    def op_step(self, keyword: str, action_name: str, *rest) -> OPStep:
+    @v_args(meta=True, inline=True)
+    def op_step(self, meta: Meta, keyword: str, action_name: str, *rest) -> OPStep:
         inputs: list[tuple[str, str]] = []
         outputs: list[tuple[str, str]] = []
         list_args = [r for r in rest if isinstance(r, list)]
@@ -163,19 +194,25 @@ class ConceptTransformer(Transformer):
                 inputs = list_args[0]
             else:
                 outputs = list_args[0]
+        line, col = _pos(meta)
         return OPStep(
             keyword=keyword,  # type: ignore[arg-type]
             action_name=action_name,
             inputs=inputs,
             outputs=outputs,
+            line=line,
+            column=col,
         )
 
-    def op_section(self, *steps: OPStep) -> OperationalPrinciple:
-        return OperationalPrinciple(steps=list(steps))
+    @v_args(meta=True, inline=True)
+    def op_section(self, meta: Meta, *steps: OPStep) -> OperationalPrinciple:
+        line, col = _pos(meta)
+        return OperationalPrinciple(steps=list(steps), line=line, column=col)
 
     # --- top level -----------------------------------------------------------
 
-    def concept_def(self, name: str, *rest) -> ConceptAST:
+    @v_args(meta=True, inline=True)
+    def concept_def(self, meta: Meta, name: str, *rest) -> ConceptAST:
         params: list[str] = []
         purpose: str = ""
         state: list[StateDecl] = []
@@ -194,6 +231,7 @@ class ConceptTransformer(Transformer):
                     actions = item
             elif isinstance(item, str):
                 purpose = item
+        line, col = _pos(meta)
         return ConceptAST(
             name=name,
             params=params,
@@ -202,6 +240,8 @@ class ConceptTransformer(Transformer):
             actions=actions,
             operational_principle=op_principle,
             source="",
+            line=line,
+            column=col,
         )
 
     def start(self, concept: ConceptAST) -> ConceptAST:
