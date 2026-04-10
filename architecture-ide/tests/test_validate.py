@@ -1074,3 +1074,59 @@ sync LogEveryInc
         # Without extra_concepts, every reference is unknown -> S1 fires twice.
         s1s = [d for d in diags if d.code == "S1"]
         assert len(s1s) == 2
+
+
+from concept_lang.parse import parse_concept_file, parse_sync_file
+
+
+FIXTURES_ROOT = Path(__file__).parent / "fixtures"
+
+
+def _load_fixture_workspace(subdir: str) -> tuple[
+    Workspace,
+    dict[str, Path],
+    dict[str, Path],
+]:
+    """
+    Load a positive-fixtures workspace by reading every concept and sync
+    file under `tests/fixtures/<subdir>/`. Returns the Workspace plus the
+    concept_files and sync_files mappings for richer diagnostics.
+    """
+    root = FIXTURES_ROOT / subdir
+    concepts: dict[str, ConceptAST] = {}
+    syncs: dict[str, SyncAST] = {}
+    concept_files: dict[str, Path] = {}
+    sync_files: dict[str, Path] = {}
+    for f in sorted((root / "concepts").glob("*.concept")):
+        ast = parse_concept_file(f)
+        concepts[ast.name] = ast
+        concept_files[ast.name] = f
+    for f in sorted((root / "syncs").glob("*.sync")):
+        sync = parse_sync_file(f)
+        syncs[sync.name] = sync
+        sync_files[sync.name] = f
+    return (
+        Workspace(concepts=concepts, syncs=syncs),
+        concept_files,
+        sync_files,
+    )
+
+
+class TestPositiveFixturesHaveNoErrors:
+    def test_architecture_ide_workspace_is_clean(self):
+        ws, cf, sf = _load_fixture_workspace("architecture_ide")
+        diags = validate_workspace(ws, concept_files=cf, sync_files=sf)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == [], (
+            "architecture_ide fixtures produced error diagnostics:\n"
+            + "\n".join(f"  {d.code} ({d.file}): {d.message}" for d in errors)
+        )
+
+    def test_realworld_workspace_is_clean(self):
+        ws, cf, sf = _load_fixture_workspace("realworld")
+        diags = validate_workspace(ws, concept_files=cf, sync_files=sf)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == [], (
+            "realworld fixtures produced error diagnostics:\n"
+            + "\n".join(f"  {d.code} ({d.file}): {d.message}" for d in errors)
+        )
