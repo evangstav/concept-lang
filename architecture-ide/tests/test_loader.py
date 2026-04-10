@@ -283,3 +283,11 @@ class TestLoadAndValidateIntegration:
         )
         errors = [d for d in validate_diags if d.severity == "error"]
         assert errors == []
+
+
+class TestLoaderReexport:
+    def test_load_workspace_importable_from_package_root(self):
+        # Public API: MCP tools in P4 import from the package root.
+        from concept_lang import load_workspace as top_level
+        from concept_lang.loader import load_workspace as module_level
+        assert top_level is module_level
