@@ -222,3 +222,76 @@ sync BadSync
         assert diags[0].code == "S1"
         assert "Counter" in diags[0].message
         assert "decrement" in diags[0].message
+
+
+from concept_lang.validate import rule_s2_pattern_fields_exist
+
+
+class TestRuleS2:
+    def test_known_fields_are_allowed(self):
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync LogEveryInc
+
+  when
+    Counter/inc: [ amount: ?amount ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        diags = rule_s2_pattern_fields_exist(sync, idx)
+        assert diags == []
+
+    def test_unknown_input_field_is_flagged(self):
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync BadSync
+
+  when
+    Counter/inc: [ bogus: ?bogus ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        diags = rule_s2_pattern_fields_exist(sync, idx)
+        assert len(diags) == 1
+        assert diags[0].code == "S2"
+        assert "bogus" in diags[0].message
+
+    def test_empty_pattern_always_allowed(self):
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync Any
+
+  when
+    Counter/inc: [ ] => [ ]
+  then
+    Log/append: [ event: ?any ]
+"""
+        )
+        diags = rule_s2_pattern_fields_exist(sync, idx)
+        assert diags == []
+
+    def test_unknown_action_is_not_reported_by_s2(self):
+        # S1 reports unknown actions; S2 stays silent on them to avoid
+        # spamming the user with cascading diagnostics.
+        ws = _workspace_with_counter_and_log()
+        idx = WorkspaceIndex.build(ws)
+        sync = parse_sync_source(
+            """
+sync BadSync
+
+  when
+    Counter/unknown: [ bogus: ?x ] => [ ]
+  then
+    Log/append: [ event: ?x ]
+"""
+        )
+        diags = rule_s2_pattern_fields_exist(sync, idx)
+        assert diags == []

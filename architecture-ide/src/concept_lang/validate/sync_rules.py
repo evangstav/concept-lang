@@ -72,3 +72,43 @@ def rule_s1_references_resolve(
                 )
             )
     return diagnostics
+
+
+def rule_s2_pattern_fields_exist(
+    sync: SyncAST,
+    index: WorkspaceIndex,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    S2: Input/output pattern field names referenced in an action pattern
+    must exist in at least one case of that action's signature.
+
+    An unknown action is silently ignored here - S1 handles that.
+    An empty pattern list matches anything, so empty patterns never fire.
+    """
+    diagnostics: list[Diagnostic] = []
+    for section, pattern in _iter_patterns(sync):
+        cases = index.action_cases(pattern.concept, pattern.action)
+        if cases is None:
+            continue  # handled by S1
+        allowed = index.action_field_names(pattern.concept, pattern.action)
+        for pf in list(pattern.input_pattern) + list(pattern.output_pattern):
+            if pf.name in allowed:
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    severity="error",
+                    file=file,
+                    line=None,
+                    column=None,
+                    code="S2",
+                    message=(
+                        f"sync '{sync.name}' {section} pattern "
+                        f"'{pattern.concept}/{pattern.action}' references "
+                        f"unknown field '{pf.name}' (declared fields: "
+                        f"{sorted(allowed)!r})"
+                    ),
+                )
+            )
+    return diagnostics
