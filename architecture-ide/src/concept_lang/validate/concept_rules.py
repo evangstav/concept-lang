@@ -86,3 +86,36 @@ def rule_c1_state_independence(
                 )
             )
     return diagnostics
+
+
+def rule_c2_effects_independence(
+    concept: ConceptAST,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C2: Effects clauses may only reference state fields declared on this concept.
+    """
+    diagnostics: list[Diagnostic] = []
+    own_fields: set[str] = {decl.name for decl in concept.state}
+    for action in concept.actions:
+        for case in action.cases:
+            for effect in case.effects:
+                if effect.field in own_fields:
+                    continue
+                diagnostics.append(
+                    Diagnostic(
+                        severity="error",
+                        file=file,
+                        line=None,
+                        column=None,
+                        code="C2",
+                        message=(
+                            f"action '{action.name}' has an effect on field "
+                            f"'{effect.field}', which is not declared in "
+                            f"concept '{concept.name}' (declared fields: "
+                            f"{sorted(own_fields)!r})"
+                        ),
+                    )
+                )
+    return diagnostics

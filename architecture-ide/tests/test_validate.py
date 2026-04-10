@@ -208,3 +208,57 @@ concept Assignment
         codes = [d.code for d in diags]
         # Both Task and Person should be flagged - the rule reports each.
         assert codes.count("C1") == 2
+
+
+from concept_lang.validate import rule_c2_effects_independence
+
+
+class TestRuleC2:
+    def test_effects_on_own_field_is_allowed(self):
+        src = """
+concept Password [U]
+
+  purpose
+    store credentials
+
+  state
+    password: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+      store the hash
+      effects:
+        password[user] := hash
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ user: x ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c2_effects_independence(ast)
+        assert diags == []
+
+    def test_effects_on_foreign_field_is_flagged(self):
+        src = """
+concept Password [U]
+
+  purpose
+    store credentials
+
+  state
+    password: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+      store the hash
+      effects:
+        profile[user] := picture
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ user: x ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c2_effects_independence(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C2"
+        assert "profile" in diags[0].message
+        assert "Password" in diags[0].message

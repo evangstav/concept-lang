@@ -7,15 +7,20 @@ values produced by `concept_lang.parse` and emits `Diagnostic` records.
 Public API (grows across the tasks of the P2 plan):
     Diagnostic
     rule_c1_state_independence
+    rule_c2_effects_independence
     validate_workspace
     validate_concept_file
     validate_sync_file
 """
 
-from concept_lang.validate.concept_rules import rule_c1_state_independence
+from concept_lang.validate.concept_rules import (
+    rule_c1_state_independence,
+    rule_c2_effects_independence,
+)
 from concept_lang.validate.diagnostic import Diagnostic
 
 __all__ = [
     "Diagnostic",
     "rule_c1_state_independence",
+    "rule_c2_effects_independence",
 ]

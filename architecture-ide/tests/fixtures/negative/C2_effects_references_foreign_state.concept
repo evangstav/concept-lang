@@ -1,0 +1,16 @@
+concept Password [U]
+
+  purpose
+    store credentials
+
+  state
+    password: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+      store the hash
+      effects:
+        profile[user] := picture
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ user: x ]
