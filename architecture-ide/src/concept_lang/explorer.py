@@ -1,27 +1,90 @@
 """
-Generate a self-contained interactive HTML concept explorer.
+Generate a self-contained interactive HTML concept explorer (v2 — new AST).
 
 Produces a single HTML file with embedded CSS and JavaScript that renders:
-- A clickable concept dependency graph (main view)
-- State machine diagram for selected concept
+- A clickable concept graph: nodes are concepts, edges are syncs
+- State machine diagram for selected concept (via v1 diagrams, temporarily)
 - Entity/state detail panel
-- Action→sync cross-reference tracing
-- Data flow visualization through sync chains
+- Action browser (multi-case)
+- Per-sync flow diagram (when → where → then)
 
 Uses D3.js for force-directed graph layout and Mermaid for diagram rendering.
-All concept data is embedded as JSON so the page works offline.
+All workspace data is embedded as JSON so the page works offline.
 """
 
 from __future__ import annotations
 
 import json
 
-from .diagrams import concept_graph, entity_diagram, state_machine
-from .models import ConceptAST
+from concept_lang.ast import (
+    ActionPattern,
+    ConceptAST,
+    PatternField,
+    SyncAST,
+    Workspace,
+)
+
+
+# --- v1 adapter (temporary; removed when diagrams/ migrates) ----------------
+
+
+def _to_v1_concept(c: ConceptAST):
+    """
+    Build a v1 `concept_lang.models.ConceptAST` from a v2 concept so the
+    existing Mermaid diagram generators (and the diagram MCP tools that
+    still operate in v1) keep working until the `diagrams/` module migrates
+    (P5 or later).
+
+    The conversion is lossy:
+
+    * v2 multi-case actions collapse to a single v1 action whose pre/post
+      clauses come from the first case's effects. Additional cases are
+      dropped.
+    * Operational principle is not represented in v1 and is dropped.
+    * Syncs are always empty because v2 holds them in separate files —
+      the v1 `ConceptAST.sync` field is set to ``[]``.
+
+    This helper is intentionally exported (no leading underscore in its
+    public meaning) so that MCP tool modules that still wrap the v1
+    diagram generators can import it without reaching into explorer's
+    internals through a name that pretends to be private.
+    """
+    from concept_lang.models import (
+        Action as V1Action,
+        ConceptAST as V1ConceptAST,
+        PrePost as V1PrePost,
+        StateDecl as V1StateDecl,
+    )
+
+    v1_state = [V1StateDecl(name=s.name, type_expr=s.type_expr) for s in c.state]
+
+    v1_actions: list = []
+    for action in c.actions:
+        first_case = action.cases[0]
+        params = [f"{tn.name}: {tn.type_expr}" for tn in first_case.inputs]
+        post_clauses = [e.raw for e in first_case.effects]
+        v1_actions.append(V1Action(
+            name=action.name,
+            params=params,
+            pre=None,
+            post=V1PrePost(clauses=post_clauses) if post_clauses else None,
+        ))
+
+    return V1ConceptAST(
+        name=c.name,
+        params=c.params,
+        purpose=c.purpose,
+        state=v1_state,
+        actions=v1_actions,
+        sync=[],
+        source=c.source,
+    )
+
+
+# --- concept JSON payload for the HTML ---------------------------------------
 
 
 def _concept_to_dict(c: ConceptAST) -> dict:
-    """Convert a ConceptAST to a JSON-serializable dict (excluding raw source)."""
     return {
         "name": c.name,
         "params": c.params,
@@ -30,115 +93,233 @@ def _concept_to_dict(c: ConceptAST) -> dict:
         "actions": [
             {
                 "name": a.name,
-                "params": a.params,
-                "pre": {"clauses": a.pre.clauses} if a.pre else None,
-                "post": {"clauses": a.post.clauses} if a.post else None,
+                "cases": [
+                    {
+                        "inputs": [
+                            {"name": tn.name, "type_expr": tn.type_expr}
+                            for tn in case.inputs
+                        ],
+                        "outputs": [
+                            {"name": tn.name, "type_expr": tn.type_expr}
+                            for tn in case.outputs
+                        ],
+                        "body": case.body,
+                        "effects": [e.raw for e in case.effects],
+                    }
+                    for case in a.cases
+                ],
             }
             for a in c.actions
         ],
-        "sync": [
+        "operational_principle": [
             {
-                "trigger_concept": s.trigger_concept,
-                "trigger_action": s.trigger_action,
-                "trigger_params": s.trigger_params,
-                "trigger_result": s.trigger_result,
-                "where_clauses": s.where_clauses,
-                "invocations": [
-                    {"action": inv.action, "params": inv.params}
-                    for inv in s.invocations
-                ],
+                "keyword": step.keyword,
+                "action_name": step.action_name,
+                "inputs": step.inputs,
+                "outputs": step.outputs,
             }
-            for s in c.sync
+            for step in c.operational_principle.steps
         ],
     }
 
 
-def _build_graph_data(concepts: list[ConceptAST]) -> dict:
-    """Build nodes and edges for the dependency graph."""
-    concept_names = {c.name for c in concepts}
-    nodes = []
-    edges = []
+def _sync_to_dict(s: SyncAST) -> dict:
+    return {
+        "name": s.name,
+        "when": [_pattern_to_dict(p) for p in s.when],
+        "where": _where_to_dict(s),
+        "then": [_pattern_to_dict(p) for p in s.then],
+    }
 
-    for c in concepts:
+
+def _pattern_to_dict(p: ActionPattern) -> dict:
+    return {
+        "concept": p.concept,
+        "action": p.action,
+        "input_pattern": [_field_to_dict(f) for f in p.input_pattern],
+        "output_pattern": [_field_to_dict(f) for f in p.output_pattern],
+    }
+
+
+def _field_to_dict(f: PatternField) -> dict:
+    return {"name": f.name, "kind": f.kind, "value": f.value}
+
+
+def _where_to_dict(s: SyncAST) -> dict | None:
+    if s.where is None:
+        return None
+    return {
+        "queries": [
+            {
+                "concept": q.concept,
+                "is_optional": q.is_optional,
+                "triples": [
+                    {"subject": t.subject, "predicate": t.predicate, "object": t.object}
+                    for t in q.triples
+                ],
+            }
+            for q in s.where.queries
+        ],
+        "binds": [
+            {"expression": b.expression, "variable": b.variable}
+            for b in s.where.binds
+        ],
+    }
+
+
+# --- graph data: syncs as edges ---------------------------------------------
+
+
+def _build_graph_data(workspace: Workspace) -> dict:
+    """
+    Build nodes and edges for the dependency graph.
+
+    Nodes: one per concept. External references (a sync mentioning a
+    concept that is not in the workspace) become ``{external: True}``
+    nodes so dangling references stay visible.
+
+    Edges: one per ``(sync, when_concept, then_concept)`` triple. Each
+    edge carries the sync name so the UI can link the edge back to its
+    source file. Self-loops are allowed.
+    """
+    concept_names = set(workspace.concepts)
+    nodes: list[dict] = []
+    seen: set[str] = set()
+
+    def add_node(name: str, *, external: bool = False) -> None:
+        if name in seen:
+            return
+        seen.add(name)
+        if external:
+            nodes.append({"id": name, "external": True})
+            return
+        c = workspace.concepts[name]
         nodes.append({
-            "id": c.name,
+            "id": name,
             "purpose": c.purpose,
-            "actionCount": len(c.actions),
             "stateCount": len(c.state),
-            "syncCount": len(c.sync),
+            "actionCount": len(c.actions),
         })
 
-        for param in c.params:
-            edges.append({
-                "source": c.name,
-                "target": param,
-                "type": "param",
-                "internal": param in concept_names,
-            })
-            if param not in concept_names:
-                nodes.append({"id": param, "external": True})
+    for name in sorted(concept_names):
+        add_node(name)
 
-        seen_sync: set[str] = set()
-        for clause in c.sync:
-            dep = clause.trigger_concept
-            if dep not in seen_sync:
-                seen_sync.add(dep)
+    edges: list[dict] = []
+
+    for sync_name in sorted(workspace.syncs):
+        sync = workspace.syncs[sync_name]
+        if not sync.when:
+            continue
+        when_concepts = sorted({p.concept for p in sync.when})
+        then_concepts = sorted({p.concept for p in sync.then})
+
+        for src in when_concepts:
+            if src not in concept_names:
+                add_node(src, external=True)
+            for dst in then_concepts:
+                if dst not in concept_names:
+                    add_node(dst, external=True)
                 edges.append({
-                    "source": c.name,
-                    "target": dep,
+                    "source": src,
+                    "target": dst,
                     "type": "sync",
-                    "internal": dep in concept_names,
+                    "syncName": sync_name,
+                    "internal": src in concept_names and dst in concept_names,
                 })
-                if dep not in concept_names:
-                    nodes.append({"id": dep, "external": True})
 
-    # Deduplicate external nodes
-    seen_ids: set[str] = set()
-    unique_nodes = []
-    for n in nodes:
-        if n["id"] not in seen_ids:
-            seen_ids.add(n["id"])
-            unique_nodes.append(n)
-
-    return {"nodes": unique_nodes, "edges": edges}
+    return {"nodes": nodes, "edges": edges}
 
 
-def _build_sync_index(concepts: list[ConceptAST]) -> dict:
-    """Build an index: concept.action -> list of concepts that sync on it."""
+def _build_sync_index(workspace: Workspace) -> dict:
+    """
+    Build an index keyed by ``concept.action`` string, mapping to the
+    syncs that mention that action in either ``when`` or ``then``.
+    """
     index: dict[str, list[dict]] = {}
-    for c in concepts:
-        for clause in c.sync:
-            key = f"{clause.trigger_concept}.{clause.trigger_action}"
-            if key not in index:
-                index[key] = []
-            for inv in clause.invocations:
-                index[key].append({
-                    "reactor": c.name,
-                    "local_action": inv.action,
-                    "trigger_params": clause.trigger_params,
-                    "local_params": inv.params,
+    for sync_name, sync in workspace.syncs.items():
+        for role, patterns in (("when", sync.when), ("then", sync.then)):
+            for pat in patterns:
+                key = f"{pat.concept}.{pat.action}"
+                index.setdefault(key, []).append({
+                    "sync": sync_name,
+                    "role": role,
                 })
     return index
 
 
-def generate_explorer(concepts: list[ConceptAST]) -> str:
-    """Generate a self-contained interactive HTML explorer for the given concepts."""
-    concept_data = {c.name: _concept_to_dict(c) for c in concepts}
-    graph_data = _build_graph_data(concepts)
-    sync_index = _build_sync_index(concepts)
+# --- graph mermaid for the top-level view ------------------------------------
 
-    # Generate Mermaid diagrams for each concept
+
+def _workspace_graph_mermaid(workspace: Workspace) -> str:
+    """Mermaid ``graph TD`` for the workspace: concepts + syncs-as-edges."""
+    lines = ["graph TD"]
+
+    concept_names = set(workspace.concepts)
+    external_refs: set[str] = set()
+
+    for name in sorted(concept_names):
+        lines.append(f'    {name}["{name}"]')
+
+    for sync_name in sorted(workspace.syncs):
+        sync = workspace.syncs[sync_name]
+        when_concepts = sorted({p.concept for p in sync.when})
+        then_concepts = sorted({p.concept for p in sync.then})
+        for src in when_concepts:
+            if src not in concept_names:
+                external_refs.add(src)
+            for dst in then_concepts:
+                if dst not in concept_names:
+                    external_refs.add(dst)
+                lines.append(f"    {src} -->|sync {sync_name}| {dst}")
+
+    for ext in sorted(external_refs):
+        lines.append(f'    {ext}["{ext} ?"]:::external')
+
+    if external_refs:
+        lines.append(
+            "    classDef external fill:#21262d,stroke:#484f58,stroke-dasharray:5"
+        )
+
+    return "\n".join(lines)
+
+
+# --- top-level entry point ---------------------------------------------------
+
+
+def generate_explorer(workspace: Workspace) -> str:
+    """
+    Generate a self-contained interactive HTML explorer for the given
+    workspace (concepts + syncs).
+    """
+    concept_data = {
+        name: _concept_to_dict(c) for name, c in workspace.concepts.items()
+    }
+    sync_data = {
+        name: _sync_to_dict(s) for name, s in workspace.syncs.items()
+    }
+    graph_data = _build_graph_data(workspace)
+    sync_index = _build_sync_index(workspace)
+
+    # Per-concept Mermaid diagrams, still generated through the v1 adapter.
+    from concept_lang.diagrams import entity_diagram, state_machine
     mermaid_diagrams: dict[str, dict[str, str]] = {}
-    for c in concepts:
-        mermaid_diagrams[c.name] = {
-            "state_machine": state_machine(c),
-            "entity_diagram": entity_diagram(c),
+    for name, c in workspace.concepts.items():
+        v1 = _to_v1_concept(c)
+        mermaid_diagrams[name] = {
+            "state_machine": state_machine(v1),
+            "entity_diagram": entity_diagram(v1),
         }
 
-    dep_graph_mermaid = concept_graph(concepts) if concepts else "graph TD\n    empty[No concepts]"
+    dep_graph_mermaid = (
+        _workspace_graph_mermaid(workspace)
+        if workspace.concepts or workspace.syncs
+        else "graph TD\n    empty[No concepts]"
+    )
 
     return _HTML_TEMPLATE.replace(
         "/*__CONCEPT_DATA__*/{}", json.dumps(concept_data, indent=2)
+    ).replace(
+        '/*__SYNC_DATA__*/{}', json.dumps(sync_data, indent=2)
     ).replace(
         '/*__GRAPH_DATA__*/{"nodes":[],"edges":[]}', json.dumps(graph_data, indent=2)
     ).replace(
@@ -410,6 +591,7 @@ marker.sync-marker { fill: var(--purple); }
 <script>
 // Embedded concept data
 const CONCEPTS = /*__CONCEPT_DATA__*/{};
+const SYNC_DATA = /*__SYNC_DATA__*/{};
 const GRAPH = /*__GRAPH_DATA__*/{"nodes":[],"edges":[]};
 const SYNC_INDEX = /*__SYNC_INDEX__*/{};
 const MERMAID = /*__MERMAID_DIAGRAMS__*/{};
