@@ -1,12 +1,15 @@
 """Round-trip tests for the new AST (concept_lang.ast)."""
 
+import pytest
+from pydantic import ValidationError
+
 from concept_lang.ast import (
     Action,
     ActionCase,
     ConceptAST,
     EffectClause,
-    OperationalPrinciple,
     OPStep,
+    OperationalPrinciple,
     StateDecl,
     TypedName,
 )
@@ -33,10 +36,21 @@ class TestEffectClause:
         assert round_tripped == ec
 
     def test_op_literal(self):
-        import pytest
-        from pydantic import ValidationError
         with pytest.raises(ValidationError):
             EffectClause(raw="x", field="x", op="<>", rhs="y")  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("op", [":=", "+=", "-="])
+    def test_op_round_trip(self, op):
+        ec = EffectClause(
+            raw=f"field {op} value",
+            field="field",
+            op=op,
+            rhs="value",
+        )
+        dumped = ec.model_dump()
+        assert dumped["op"] == op
+        round_tripped = EffectClause.model_validate(dumped)
+        assert round_tripped == ec
 
 
 class TestConceptAST:
