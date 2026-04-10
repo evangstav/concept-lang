@@ -104,3 +104,64 @@ sync OnRegister
         assert sync.when[0].input_pattern[0].kind == "literal"
         assert sync.when[0].input_pattern[0].value == '"register"'
         assert sync.then[0].input_pattern[0].value == '"register"'
+
+
+
+class TestSyncWhere:
+    def test_bind_only(self):
+        src = """
+sync Register
+
+  when
+    Web/request: [ method: "register" ] => [ ]
+  where
+    bind (uuid() as ?user)
+  then
+    User/register: [ user: ?user ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.where is not None
+        assert len(sync.where.binds) == 1
+        assert sync.where.binds[0].variable == "?user"
+        assert "uuid" in sync.where.binds[0].expression
+
+    def test_state_query(self):
+        src = """
+sync FormatArticle
+
+  when
+    Web/format: [ article: ?article ] => [ ]
+  where
+    Article: {
+      ?article title: ?title ;
+               body: ?body
+    }
+  then
+    Web/respond: [ title: ?title ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.where is not None
+        assert len(sync.where.queries) == 1
+        q = sync.where.queries[0]
+        assert q.concept == "Article"
+        assert q.is_optional is False
+        assert len(q.triples) == 2
+        assert q.triples[0].subject == "?article"
+        assert q.triples[0].predicate == "title"
+        assert q.triples[0].object == "?title"
+        assert q.triples[1].subject == "?article"  # shared subject propagated
+        assert q.triples[1].predicate == "body"
+
+    def test_optional_state_query(self):
+        src = """
+sync FormatWithTags
+
+  when
+    Web/format: [ article: ?article ] => [ ]
+  where
+    optional Tag: { ?article tag: ?tag }
+  then
+    Web/respond: [ tag: ?tag ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.where.queries[0].is_optional is True
