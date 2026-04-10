@@ -1,6 +1,6 @@
 ---
-name: explore
 description: Generate an interactive HTML explorer with dependency graphs, state machines, entity diagrams, and action tracing for all concepts.
+disable-model-invocation: true
 allowed-tools: mcp__concept-lang__get_interactive_explorer, mcp__concept-lang__get_explorer_html, mcp__concept-lang__list_concepts, mcp__concept-lang__get_dependency_graph
 ---
 

@@ -1,0 +1,17 @@
+{
+  "name": "concept-lang-marketplace",
+  "owner": {
+    "name": "evangstav",
+    "url": "https://github.com/evangstav"
+  },
+  "metadata": {
+    "description": "Daniel Jackson-style concept design plugins for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "concept-lang",
+      "source": "./",
+      "description": "MCP server for building, reviewing, scaffolding, and exploring Daniel Jackson-style concept specs"
+    }
+  ]
+}

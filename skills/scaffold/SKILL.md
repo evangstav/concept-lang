@@ -1,7 +1,7 @@
 ---
-name: scaffold
 description: Analyze an existing codebase and extract draft .concept specs from its domain models, services, and controllers.
 argument-hint: "<source directory to analyze>"
+disable-model-invocation: true
 allowed-tools: mcp__concept-lang__scaffold_concepts, mcp__concept-lang__write_concept, mcp__concept-lang__validate_concept, mcp__concept-lang__list_concepts
 ---
 

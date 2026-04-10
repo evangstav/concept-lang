@@ -1,7 +1,7 @@
 ---
-name: build
 description: Iteratively build a .concept spec from a natural language description using Daniel Jackson's concept design methodology.
 argument-hint: "<description of the concept to build>"
+disable-model-invocation: true
 allowed-tools: mcp__concept-lang__write_concept, mcp__concept-lang__read_concept, mcp__concept-lang__list_concepts, mcp__concept-lang__validate_concept, mcp__concept-lang__get_dependency_graph
 ---
 

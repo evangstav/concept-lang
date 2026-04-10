@@ -1,5 +1,4 @@
 ---
-name: review
 description: Review concept specs for coherence, independence, completeness, and design quality. Pass concept names or use without args to review all.
 argument-hint: "[concept names, comma-separated]"
 allowed-tools: mcp__concept-lang__read_concept, mcp__concept-lang__list_concepts, mcp__concept-lang__validate_concept, mcp__concept-lang__get_dependency_graph, mcp__concept-lang__get_state_machine, mcp__concept-lang__get_entity_diagram

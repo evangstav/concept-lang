@@ -10,8 +10,8 @@ mail/
 __pycache__/
 *.pyc
 *.egg-info/
-dist/
-build/
+architecture-ide/dist/
+architecture-ide/build/
 
 # IDE / OS
 .DS_Store
