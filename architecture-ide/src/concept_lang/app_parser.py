@@ -1,4 +1,17 @@
 """
+LEGACY FENCE (0.3.0): v1 app-spec parser.
+
+This module is one of four fenced-off legacy survivors kept in the tree
+to back the app-spec bridge in `concept_lang.tools.app_tools`. The
+v2 concept format introduced in P1-P6 does not have an app-spec
+equivalent; a dedicated follow-up plan will migrate this layer in a
+future release.
+
+Do not import from here in new code. The only legitimate consumer is
+`concept_lang.tools.app_tools`.
+
+Historical description:
+
 Parser for .app files (concept composition specs).
 
 Format:

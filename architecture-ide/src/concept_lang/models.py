@@ -1,3 +1,18 @@
+"""
+LEGACY FENCE (0.3.0): v1 Pydantic AST types.
+
+This module is one of four fenced-off legacy survivors kept in the tree
+to back the app-spec bridge in `concept_lang.tools.app_tools`. It is
+NOT the v2 AST — that lives at `concept_lang.ast` with paper-aligned
+multi-case actions, operational principle, and optional source
+positions.
+
+Do not import from here in new code. The only legitimate consumers
+are `concept_lang.parser`, `concept_lang.app_parser`,
+`concept_lang.app_validator`, and `concept_lang.tools.app_tools` —
+all of which back the same legacy app-spec bridge path.
+"""
+
 from pydantic import BaseModel
 
 
