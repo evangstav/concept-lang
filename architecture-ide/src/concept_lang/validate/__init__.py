@@ -17,6 +17,7 @@ from concept_lang.validate.sync_rules import (
     rule_s2_pattern_fields_exist,
     rule_s3_then_vars_bound,
     rule_s4_where_vars_bound,
+    rule_s5_multiple_concepts,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "rule_s2_pattern_fields_exist",
     "rule_s3_then_vars_bound",
     "rule_s4_where_vars_bound",
+    "rule_s5_multiple_concepts",
 ]

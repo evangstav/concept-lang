@@ -410,3 +410,42 @@ sync Ok
 """
         )
         assert rule_s4_where_vars_bound(sync, idx) == []
+
+
+from concept_lang.validate import rule_s5_multiple_concepts
+
+
+class TestRuleS5:
+    def _index(self) -> WorkspaceIndex:
+        return WorkspaceIndex.build(_workspace_with_counter_and_log())
+
+    def test_two_concepts_is_clean(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync LogEveryInc
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Log/append: [ event: ?total ]
+"""
+        )
+        assert rule_s5_multiple_concepts(sync, idx) == []
+
+    def test_one_concept_is_warning(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync InternalOnly
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Counter/inc: [ amount: ?total ]
+"""
+        )
+        diags = rule_s5_multiple_concepts(sync, idx)
+        assert len(diags) == 1
+        assert diags[0].code == "S5"
+        assert diags[0].severity == "warning"

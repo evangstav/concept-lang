@@ -237,3 +237,35 @@ def rule_s4_where_vars_bound(
             if triple.object.startswith("?"):
                 bound.add(triple.object)
     return diagnostics
+
+
+def rule_s5_multiple_concepts(
+    sync: SyncAST,
+    index: WorkspaceIndex,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    S5 (warning): A sync should reference at least 2 distinct concepts
+    across its `when` and `then` clauses.
+    """
+    _ = index
+    concepts: set[str] = set()
+    for pattern in list(sync.when) + list(sync.then):
+        concepts.add(pattern.concept)
+    if len(concepts) >= 2:
+        return []
+    return [
+        Diagnostic(
+            severity="warning",
+            file=file,
+            line=None,
+            column=None,
+            code="S5",
+            message=(
+                f"sync '{sync.name}' references only {len(concepts)} "
+                f"concept(s) ({sorted(concepts)!r}) - single-concept syncs "
+                f"are usually better expressed inside the concept itself"
+            ),
+        )
+    ]
