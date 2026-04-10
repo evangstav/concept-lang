@@ -1,0 +1,6 @@
+sync NewUserToken
+
+  when
+    User/register: [ ] => [ user: ?user ]
+  then
+    JWT/generate: [ user: ?user ]
