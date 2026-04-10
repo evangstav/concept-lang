@@ -1,6 +1,7 @@
 """Tests for the new Lark-based parser (concept_lang.parse)."""
 
 from concept_lang.parse import parse_concept_source
+from concept_lang.parse import parse_sync_source
 
 
 class TestConceptHeader:
@@ -252,3 +253,103 @@ concept Counter
 """
         ast = parse_concept_source(src)
         assert ast.operational_principle.steps[1].keyword == "and"
+
+
+class TestSyncBasic:
+    def test_simple_when_then(self):
+        src = """
+sync LogEveryRequest
+
+  when
+    Web/request: [ ] => [ request: ?request ]
+  then
+    Log/append: [ event: ?request ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.name == "LogEveryRequest"
+        assert len(sync.when) == 1
+        assert sync.when[0].concept == "Web"
+        assert sync.when[0].action == "request"
+        assert sync.when[0].input_pattern == []
+        assert len(sync.when[0].output_pattern) == 1
+        assert sync.when[0].output_pattern[0].name == "request"
+        assert sync.when[0].output_pattern[0].kind == "var"
+        assert sync.when[0].output_pattern[0].value == "?request"
+        assert len(sync.then) == 1
+        assert sync.then[0].concept == "Log"
+        assert sync.then[0].action == "append"
+
+    def test_literal_in_when(self):
+        src = """
+sync OnRegister
+
+  when
+    Web/request: [ method: "register" ] => [ ]
+  then
+    Audit/log: [ kind: "register" ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.when[0].input_pattern[0].kind == "literal"
+        assert sync.when[0].input_pattern[0].value == '"register"'
+        assert sync.then[0].input_pattern[0].value == '"register"'
+
+
+
+class TestSyncWhere:
+    def test_bind_only(self):
+        src = """
+sync Register
+
+  when
+    Web/request: [ method: "register" ] => [ ]
+  where
+    bind (uuid() as ?user)
+  then
+    User/register: [ user: ?user ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.where is not None
+        assert len(sync.where.binds) == 1
+        assert sync.where.binds[0].variable == "?user"
+        assert "uuid" in sync.where.binds[0].expression
+
+    def test_state_query(self):
+        src = """
+sync FormatArticle
+
+  when
+    Web/format: [ article: ?article ] => [ ]
+  where
+    Article: {
+      ?article title: ?title ;
+               body: ?body
+    }
+  then
+    Web/respond: [ title: ?title ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.where is not None
+        assert len(sync.where.queries) == 1
+        q = sync.where.queries[0]
+        assert q.concept == "Article"
+        assert q.is_optional is False
+        assert len(q.triples) == 2
+        assert q.triples[0].subject == "?article"
+        assert q.triples[0].predicate == "title"
+        assert q.triples[0].object == "?title"
+        assert q.triples[1].subject == "?article"  # shared subject propagated
+        assert q.triples[1].predicate == "body"
+
+    def test_optional_state_query(self):
+        src = """
+sync FormatWithTags
+
+  when
+    Web/format: [ article: ?article ] => [ ]
+  where
+    optional Tag: { ?article tag: ?tag }
+  then
+    Web/respond: [ tag: ?tag ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.where.queries[0].is_optional is True
