@@ -222,3 +222,64 @@ class TestLoadWorkspaceErrors:
         assert ws.concepts == {}
         assert ws.syncs == {}
         assert diags == []
+
+
+class TestLoadAndValidateIntegration:
+    """
+    End-to-end pin: loading a positive-fixture workspace and validating
+    the result must produce zero error-level diagnostics.
+    """
+
+    def test_load_and_validate_realworld_is_clean(self):
+        from concept_lang.parse import parse_sync_file
+        from concept_lang.validate import validate_workspace
+
+        realworld = Path(__file__).parent / "fixtures" / "realworld"
+        ws, load_diags = load_workspace(realworld)
+        assert load_diags == [], (
+            "loading realworld produced parse diagnostics:\n"
+            + "\n".join(f"  {d.code} ({d.file}): {d.message}" for d in load_diags)
+        )
+        assert ws.concepts
+        assert ws.syncs
+
+        # Build the concept_files / sync_files map so that validator
+        # diagnostics carry real paths.
+        concept_files = {
+            name: (realworld / "concepts" / f"{name}.concept")
+            for name in ws.concepts
+        }
+        sync_files: dict = {}
+        for p in sorted((realworld / "syncs").glob("*.sync")):
+            sync_files[parse_sync_file(p).name] = p
+
+        validate_diags = validate_workspace(
+            ws, concept_files=concept_files, sync_files=sync_files
+        )
+        errors = [d for d in validate_diags if d.severity == "error"]
+        assert errors == [], (
+            "realworld validator errors after load_workspace:\n"
+            + "\n".join(f"  {d.code} ({d.file}): {d.message}" for d in errors)
+        )
+
+    def test_load_and_validate_architecture_ide_is_clean(self):
+        from concept_lang.parse import parse_sync_file
+        from concept_lang.validate import validate_workspace
+
+        root = Path(__file__).parent / "fixtures" / "architecture_ide"
+        ws, load_diags = load_workspace(root)
+        assert load_diags == []
+
+        concept_files = {
+            name: (root / "concepts" / f"{name}.concept")
+            for name in ws.concepts
+        }
+        sync_files: dict = {}
+        for p in sorted((root / "syncs").glob("*.sync")):
+            sync_files[parse_sync_file(p).name] = p
+
+        validate_diags = validate_workspace(
+            ws, concept_files=concept_files, sync_files=sync_files
+        )
+        errors = [d for d in validate_diags if d.severity == "error"]
+        assert errors == []
