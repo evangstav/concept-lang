@@ -3,9 +3,10 @@ Validator rules for a single `SyncAST` (paper rules S1..S5).
 
 Each rule is a pure function that takes the sync AST plus a
 `WorkspaceIndex` (for cross-reference lookups) and returns a list of
-`Diagnostic` records. Line/column information is best-effort: the P1
-parser does not yet attach source positions to AST nodes, so most
-diagnostics produced here use `line=None`.
+`Diagnostic` records. Diagnostics carry source positions pulled from the
+AST nodes they flag: pattern-scoped rules (S1-S3) use the offending
+`ActionPattern`'s position, S4 uses the offending `StateQuery`'s
+position, and S5 (sync-scoped warning) uses the `SyncAST`'s position.
 """
 
 import re
@@ -45,8 +46,8 @@ def rule_s1_references_resolve(
                 Diagnostic(
                     severity="error",
                     file=file,
-                    line=None,
-                    column=None,
+                    line=pattern.line,
+                    column=pattern.column,
                     code="S1",
                     message=(
                         f"sync '{sync.name}' {section} references unknown "
@@ -61,8 +62,8 @@ def rule_s1_references_resolve(
                 Diagnostic(
                     severity="error",
                     file=file,
-                    line=None,
-                    column=None,
+                    line=pattern.line,
+                    column=pattern.column,
                     code="S1",
                     message=(
                         f"sync '{sync.name}' {section} references action "
@@ -110,8 +111,8 @@ def rule_s2_pattern_fields_exist(
                 Diagnostic(
                     severity="error",
                     file=file,
-                    line=None,
-                    column=None,
+                    line=pattern.line,
+                    column=pattern.column,
                     code="S2",
                     message=(
                         f"sync '{sync.name}' then pattern "
@@ -185,8 +186,8 @@ def rule_s3_then_vars_bound(
                 Diagnostic(
                     severity="error",
                     file=file,
-                    line=None,
-                    column=None,
+                    line=pattern.line,
+                    column=pattern.column,
                     code="S3",
                     message=(
                         f"sync '{sync.name}' then clause references "
@@ -229,8 +230,8 @@ def rule_s4_where_vars_bound(
                     Diagnostic(
                         severity="error",
                         file=file,
-                        line=None,
-                        column=None,
+                        line=query.line,
+                        column=query.column,
                         code="S4",
                         message=(
                             f"sync '{sync.name}' where clause state query on "
@@ -269,8 +270,8 @@ def rule_s5_multiple_concepts(
         Diagnostic(
             severity="warning",
             file=file,
-            line=None,
-            column=None,
+            line=sync.line,
+            column=sync.column,
             code="S5",
             message=(
                 f"sync '{sync.name}' references only {len(concepts)} "

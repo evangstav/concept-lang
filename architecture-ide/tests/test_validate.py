@@ -1380,3 +1380,85 @@ class TestConceptRulesCarryPositions:
         diags = rule_c5_has_purpose(ast)
         assert len(diags) == 1
         assert diags[0].line == 1
+
+
+class TestSyncRulesCarryPositions:
+    def _ws(self):
+        return _workspace_with_counter_and_log()
+
+    def test_s1_reports_pattern_line(self):
+        src = (
+            "sync BadWhen\n"                              # line 1
+            "\n"                                           # line 2
+            "  when\n"                                     # line 3
+            "    Nope/do: [ ] => [ ]\n"                    # line 4 - offending
+            "  then\n"                                     # line 5
+            "    Log/append: [ event: \"e\" ]\n"          # line 6
+        )
+        sync = parse_sync_source(src)
+        index = WorkspaceIndex.build(self._ws())
+        diags = rule_s1_references_resolve(sync, index)
+        assert len(diags) == 1
+        assert diags[0].line == 4
+
+    def test_s2_reports_pattern_line(self):
+        src = (
+            "sync BadField\n"                              # line 1
+            "\n"                                           # line 2
+            "  when\n"                                     # line 3
+            "    Counter/inc: [ n: ?n ] => [ total: ?t ]\n"  # line 4
+            "  then\n"                                     # line 5
+            "    Log/append: [ bogus: ?t ]\n"              # line 6 - offending
+        )
+        sync = parse_sync_source(src)
+        index = WorkspaceIndex.build(self._ws())
+        diags = rule_s2_pattern_fields_exist(sync, index)
+        assert len(diags) == 1
+        assert diags[0].line == 6
+
+    def test_s3_reports_then_pattern_line(self):
+        src = (
+            "sync Unbound\n"                               # line 1
+            "\n"                                           # line 2
+            "  when\n"                                     # line 3
+            "    Counter/inc: [ ] => [ ]\n"                # line 4
+            "  then\n"                                     # line 5
+            "    Log/append: [ event: ?ghost ]\n"          # line 6 - offending
+        )
+        sync = parse_sync_source(src)
+        index = WorkspaceIndex.build(self._ws())
+        diags = rule_s3_then_vars_bound(sync, index)
+        assert len(diags) == 1
+        assert diags[0].line == 6
+
+    def test_s4_reports_state_query_line(self):
+        src = (
+            "sync BadWhere\n"                              # line 1
+            "\n"                                           # line 2
+            "  when\n"                                     # line 3
+            "    Counter/inc: [ ] => [ ]\n"                # line 4
+            "  where\n"                                    # line 5
+            "    Log: { ?ghost event: ?e }\n"              # line 6 - offending
+            "  then\n"                                     # line 7
+            "    Log/append: [ event: ?e ]\n"              # line 8
+        )
+        sync = parse_sync_source(src)
+        index = WorkspaceIndex.build(self._ws())
+        diags = rule_s4_where_vars_bound(sync, index)
+        assert len(diags) == 1
+        assert diags[0].line == 6
+
+    def test_s5_reports_sync_line(self):
+        src = (
+            "sync OneConcept\n"                            # line 1
+            "\n"                                           # line 2
+            "  when\n"                                     # line 3
+            "    Counter/inc: [ ] => [ ]\n"                # line 4
+            "  then\n"                                     # line 5
+            "    Counter/inc: [ amount: ?t ]\n"            # line 6
+        )
+        sync = parse_sync_source(src)
+        index = WorkspaceIndex.build(self._ws())
+        diags = rule_s5_multiple_concepts(sync, index)
+        assert len(diags) == 1
+        assert diags[0].line == 1
