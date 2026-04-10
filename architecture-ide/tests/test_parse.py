@@ -381,3 +381,26 @@ class TestArchitectureIdeFixtures:
             assert sync.name, f"{f.name}: empty name"
             assert sync.when, f"{f.name}: empty when"
             assert sync.then, f"{f.name}: empty then"
+
+
+class TestRealworldFixtures:
+    FIXTURES_ROOT = Path(__file__).parent / "fixtures" / "realworld"
+
+    def test_all_concepts_parse(self):
+        concepts_dir = self.FIXTURES_ROOT / "concepts"
+        files = sorted(concepts_dir.glob("*.concept"))
+        assert len(files) == 6, f"Expected 6 concept fixtures, found {len(files)}"
+        for f in files:
+            ast = parse_concept_file(f)
+            assert ast.name, f"{f.name}: empty name"
+            assert ast.purpose, f"{f.name}: missing purpose"
+
+    def test_all_syncs_parse(self):
+        syncs_dir = self.FIXTURES_ROOT / "syncs"
+        files = sorted(syncs_dir.glob("*.sync"))
+        assert len(files) == 6, f"Expected 6 sync fixtures, found {len(files)}"
+        for f in files:
+            sync = parse_sync_file(f)
+            assert sync.name, f"{f.name}: empty name"
+            assert sync.when, f"{f.name}: empty when"
+            assert sync.then, f"{f.name}: empty then"
