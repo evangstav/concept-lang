@@ -6,6 +6,7 @@ from concept_lang.ast import (
     Action,
     ActionCase,
     ConceptAST,
+    EffectClause,
     OperationalPrinciple,
     StateDecl,
     TypedName,
@@ -35,6 +36,18 @@ class ConceptTransformer(Transformer):
     def TYPE_REF(self, token: Token) -> str:
         return str(token).strip()
 
+    def BODY_LINE(self, token: Token) -> str:
+        return str(token).strip()
+
+    def FIELD_REF(self, token: Token) -> str:
+        return str(token).strip()
+
+    def EFFECT_OP(self, token: Token) -> str:
+        return str(token).strip()
+
+    def EFFECT_RHS(self, token: Token) -> str:
+        return str(token).strip()
+
     # --- sections ------------------------------------------------------------
 
     def type_params(self, *names: str) -> list[str]:
@@ -58,12 +71,38 @@ class ConceptTransformer(Transformer):
     def typed_name_list(self, *names: TypedName) -> list[TypedName]:
         return list(names)
 
+    def effect_line(self, field_ref: str, op: str, rhs: str) -> EffectClause:
+        # field_ref might be "password[user]" — strip subscript for .field
+        field_name = field_ref.split("[", 1)[0]
+        return EffectClause(
+            raw=f"{field_ref} {op} {rhs}",
+            field=field_name,
+            op=op,  # type: ignore[arg-type]
+            rhs=rhs,
+        )
+
+    def effects_clause(self, *effects: EffectClause) -> list[EffectClause]:
+        return list(effects)
+
+    def case_body(self, *items) -> tuple[list[str], list[EffectClause]]:
+        body_lines: list[str] = []
+        effects: list[EffectClause] = []
+        for item in items:
+            if isinstance(item, str):
+                body_lines.append(item)
+            elif isinstance(item, list):
+                effects = item  # single effects_clause result
+        return body_lines, effects
+
     def action_case(self, name: str, *rest) -> tuple[str, ActionCase]:
-        # rest contains up to two typed_name_list results (inputs, outputs).
-        # Either may be absent if the corresponding `[ ]` bracket was empty.
         inputs: list[TypedName] = []
         outputs: list[TypedName] = []
+        body_lines: list[str] = []
+        effects: list[EffectClause] = []
+
         list_args = [r for r in rest if isinstance(r, list)]
+        tuple_args = [r for r in rest if isinstance(r, tuple)]
+
         if len(list_args) == 2:
             inputs, outputs = list_args
         elif len(list_args) == 1:
@@ -72,7 +111,16 @@ class ConceptTransformer(Transformer):
                 inputs = list_args[0]
             else:
                 outputs = list_args[0]
-        return name, ActionCase(inputs=inputs, outputs=outputs, body=[], effects=[])
+
+        if tuple_args:
+            body_lines, effects = tuple_args[0]
+
+        return name, ActionCase(
+            inputs=inputs,
+            outputs=outputs,
+            body=body_lines,
+            effects=effects,
+        )
 
     def actions_section(self, *cases: tuple[str, ActionCase]) -> list[Action]:
         grouped: dict[str, list[ActionCase]] = {}

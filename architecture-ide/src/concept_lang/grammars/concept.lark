@@ -1,14 +1,12 @@
-// concept-lang 0.2.0 — concept grammar (header + purpose + state + actions headers)
+// concept-lang 0.2.0 — concept grammar (through action bodies with effects:)
 // See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.1.
 //
 // INVARIANT: section keywords ("purpose", "state", "actions", "operational",
 // "effects") MUST remain bare string literals in the rules below — never
-// promote them to named terminals (e.g. `STATE_KW: "state"`). PURPOSE_LINE
-// and (in later tasks) BODY_LINE are greedy regexes that would otherwise
-// swallow them. Lark's contextual lexer only picks a keyword over these
-// greedy terminals when the parser expects a new section, and it can only
-// do so if the keyword is an anonymous token introduced by a literal in
-// a rule. Changing this breaks every section boundary in the grammar.
+// promote them to named terminals. PURPOSE_LINE and BODY_LINE are greedy
+// regexes that would otherwise swallow them. Lark's contextual lexer only
+// picks a keyword over these greedy terminals when the parser expects a new
+// section. Changing this breaks every section boundary in the grammar.
 
 start: concept_def
 
@@ -23,16 +21,34 @@ state_section: "state" state_decl+
 state_decl: NAME ":" TYPE_EXPR
 
 actions_section: "actions" action_case+
-action_case: NAME "[" typed_name_list? "]" "=>" "[" typed_name_list? "]"
+
+action_case: NAME "[" typed_name_list? "]" "=>" "[" typed_name_list? "]" case_body?
+case_body: BODY_LINE* effects_clause?
+
+effects_clause: "effects" ":" effect_line+
+effect_line: FIELD_REF EFFECT_OP EFFECT_RHS
+FIELD_REF: /[A-Za-z_][A-Za-z0-9_]*(\[[A-Za-z_][A-Za-z0-9_]*\])?/
+EFFECT_OP: ":=" | "+=" | "-="
+EFFECT_RHS: /[^\n]+/
 
 typed_name_list: typed_name (";" typed_name)*
 typed_name: NAME ":" TYPE_REF
 
 TYPE_EXPR: /[^\n]+/
-// TYPE_REF is a restricted type used inside `[ name: TYPE ]` brackets —
-// stops at `;` and `]`. Allows generic `->` returns like `U -> string` but
-// not newlines.
-TYPE_REF: /[A-Za-z_][A-Za-z0-9_ \->]*/
+TYPE_REF:  /[A-Za-z_][A-Za-z0-9_ \->]*/
+
+// BODY_LINE matches an indented non-empty line that is NOT a reserved section
+// keyword or the start of an action header. The negative lookaheads prevent
+// it from swallowing the next section boundary.
+//
+// The `(?![ \t])` immediately after `[ \t]+` is critical: without it, Python's
+// regex engine backtracks the greedy whitespace match to land on a position
+// where the negative lookahead succeeds vacuously (e.g. matching just 1 space
+// of indentation, leaving the next char as a space, which doesn't match any
+// of the reserved alternations). Anchoring the leading whitespace to consume
+// ALL leading whitespace forces the lookahead to evaluate against the first
+// non-whitespace character.
+BODY_LINE: /[ \t]+(?![ \t])(?!purpose|state|actions|operational|effects:|[A-Za-z_][A-Za-z0-9_]*\s*\[)[^\n]+/
 
 PURPOSE_LINE: /[ \t]+[^\n]+/
 

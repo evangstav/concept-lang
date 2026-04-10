@@ -150,3 +150,57 @@ concept Password [U]
         assert len(set_action.cases) == 2
         assert set_action.cases[0].outputs[0].name == "user"
         assert set_action.cases[1].outputs[0].name == "error"
+
+
+class TestConceptActionBody:
+    def test_natural_language_body(self):
+        src = """
+concept Password [U]
+
+  purpose
+    credentials
+
+  state
+    password: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+      generate a random salt
+      compute the hash
+      return the user
+"""
+        ast = parse_concept_source(src)
+        case = ast.actions[0].cases[0]
+        assert case.body == [
+            "generate a random salt",
+            "compute the hash",
+            "return the user",
+        ]
+        assert case.effects == []
+
+    def test_effects_clause(self):
+        src = """
+concept Password [U]
+
+  purpose
+    credentials
+
+  state
+    password: U -> string
+    salt: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+      generate a random salt
+      effects:
+        password[user] := hash
+        salt[user] := generated_salt
+"""
+        ast = parse_concept_source(src)
+        case = ast.actions[0].cases[0]
+        assert case.body == ["generate a random salt"]
+        assert len(case.effects) == 2
+        assert case.effects[0].field == "password"
+        assert case.effects[0].op == ":="
+        assert case.effects[0].rhs == "hash"
+        assert case.effects[1].field == "salt"
