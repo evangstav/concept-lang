@@ -128,6 +128,8 @@ class ActionPattern(BaseModel):
     action: str
     input_pattern: list[PatternField]
     output_pattern: list[PatternField]
+    line: int | None = None
+    column: int | None = None
 
 
 class Triple(BaseModel):
@@ -148,6 +150,8 @@ class StateQuery(BaseModel):
     concept: str
     triples: list[Triple]
     is_optional: bool = False
+    line: int | None = None
+    column: int | None = None
 
 
 class BindClause(BaseModel):
@@ -159,12 +163,16 @@ class BindClause(BaseModel):
     """
     expression: str
     variable: str                     # e.g. "?user"
+    line: int | None = None
+    column: int | None = None
 
 
 class WhereClause(BaseModel):
     """The `where` section of a sync: state queries and binds."""
     queries: list[StateQuery] = []
     binds: list[BindClause] = []
+    line: int | None = None
+    column: int | None = None
 
 
 class SyncAST(BaseModel):
@@ -174,6 +182,8 @@ class SyncAST(BaseModel):
     where: WhereClause | None = None
     then: list[ActionPattern]
     source: str
+    line: int | None = None
+    column: int | None = None
 
 
 # --- Workspace -------------------------------------------------------------

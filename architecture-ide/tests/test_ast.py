@@ -274,3 +274,38 @@ class TestConceptASTPositions:
             column=5,
         )
         assert OPStep.model_validate(step.model_dump()) == step
+
+
+class TestSyncASTPositions:
+    def test_sync_ast_line_defaults_to_none(self):
+        sync = TestSyncAST()._make_register_sync()
+        assert sync.line is None
+        assert sync.column is None
+
+    def test_action_pattern_line_roundtrip(self):
+        ap = ActionPattern(
+            concept="Counter",
+            action="inc",
+            input_pattern=[],
+            output_pattern=[],
+            line=4,
+            column=5,
+        )
+        assert ActionPattern.model_validate(ap.model_dump()) == ap
+
+    def test_state_query_line_roundtrip(self):
+        q = StateQuery(
+            concept="Article",
+            triples=[Triple(subject="?a", predicate="title", object="?t")],
+            line=9,
+            column=5,
+        )
+        assert StateQuery.model_validate(q.model_dump()) == q
+
+    def test_bind_clause_line_roundtrip(self):
+        b = BindClause(expression="uuid()", variable="?u", line=11, column=7)
+        assert BindClause.model_validate(b.model_dump()) == b
+
+    def test_where_clause_line_roundtrip(self):
+        wc = WhereClause(queries=[], binds=[], line=8, column=3)
+        assert WhereClause.model_validate(wc.model_dump()) == wc
