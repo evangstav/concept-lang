@@ -15,7 +15,7 @@ concept Concept [Name, Designer]
         named += name
 
     articulate [ name: Name ] => [ name: Name ]
-      record the concept's purpose statement
+      state the concept's purpose
       effects:
         purposeful += name
 

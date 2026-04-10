@@ -59,7 +59,17 @@ TYPE_REF:  /[A-Za-z_][A-Za-z0-9_ \->]*/
 // of the reserved alternations). Anchoring the leading whitespace to consume
 // ALL leading whitespace forces the lookahead to evaluate against the first
 // non-whitespace character.
-BODY_LINE: /[ \t]+(?![ \t])(?!purpose|state|actions|operational|effects:|[A-Za-z_][A-Za-z0-9_]*\s*\[)[^\n]+/
+//
+// The `[ \t]*\n` anchors after each section keyword are also critical: a
+// keyword ONLY starts a new section when it stands alone on its line
+// (optional trailing whitespace then newline). Without the newline anchor,
+// natural English prose like "state the concept's purpose" or "actions
+// below should also be valid prose" would be misread as section boundaries
+// and the parser would silently fall through, letting PURPOSE_LINE swallow
+// everything. `operational` needs its dedicated pattern because the actual
+// section opener is `operational principle`, and `effects:` needs the
+// trailing colon because it has one in the source.
+BODY_LINE: /[ \t]+(?![ \t])(?!(?:purpose|state|actions)[ \t]*\n|operational[ \t]+principle[ \t]*\n|effects:[ \t]*\n|[A-Za-z_][A-Za-z0-9_]*[ \t]*\[)[^\n]+/
 
 PURPOSE_LINE: /[ \t]+[^\n]+/
 

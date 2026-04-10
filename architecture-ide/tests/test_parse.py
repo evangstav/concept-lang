@@ -210,6 +210,48 @@ concept Password [U]
         assert case.effects[0].rhs == "hash"
         assert case.effects[1].field == "salt"
 
+    def test_body_line_starting_with_section_keyword_word(self):
+        # Regression: body lines whose first word is a section keyword
+        # (state, actions, operational, purpose, effects) must parse as
+        # normal BODY_LINE content, not silently cascade into purpose_body.
+        # The BODY_LINE negative lookahead only excludes the keyword when
+        # it stands alone on its line (keyword + optional whitespace +
+        # newline), so natural English prose starting with those words
+        # is free to appear in action bodies.
+        src = """
+concept Concept [Name]
+
+  purpose
+    define a named unit
+
+  state
+    named: set Name
+
+  actions
+    articulate [ name: Name ] => [ name: Name ]
+      state the concept's purpose
+      effects:
+        named += name
+
+    review [ name: Name ] => [ name: Name ]
+      actions below should also be valid prose
+      operational semantics are discussed here
+      purpose statements belong in the description
+      effects on state are what matter
+"""
+        ast = parse_concept_source(src)
+        assert len(ast.actions) == 2
+        articulate_case = ast.actions[0].cases[0]
+        assert articulate_case.body == ["state the concept's purpose"]
+        assert len(articulate_case.effects) == 1
+        review_case = ast.actions[1].cases[0]
+        assert review_case.body == [
+            "actions below should also be valid prose",
+            "operational semantics are discussed here",
+            "purpose statements belong in the description",
+            "effects on state are what matter",
+        ]
+
 
 class TestConceptOperationalPrinciple:
     def test_two_step_principle(self):
