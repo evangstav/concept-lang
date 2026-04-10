@@ -1,0 +1,13 @@
+concept Counter
+
+  purpose
+     
+
+  state
+    total: int
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]

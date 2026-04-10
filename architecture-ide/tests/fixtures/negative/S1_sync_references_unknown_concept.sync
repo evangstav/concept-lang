@@ -1,0 +1,6 @@
+sync BadSync
+
+  when
+    Counter/inc: [ amount: ?amount ] => [ total: ?total ]
+  then
+    Mailer/send: [ body: ?total ]

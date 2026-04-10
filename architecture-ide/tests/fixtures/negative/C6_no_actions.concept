@@ -1,0 +1,7 @@
+concept Pointless
+
+  purpose
+    do nothing
+
+  operational principle
+    after inc [ ] => [ total: 1 ]

@@ -1,0 +1,8 @@
+sync Bad
+
+  when
+    Counter/inc: [ ] => [ ]
+  where
+    Counter: { ?mystery amount: ?amount }
+  then
+    Log/append: [ event: ?amount ]

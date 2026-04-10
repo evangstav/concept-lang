@@ -1,0 +1,9 @@
+{
+  "diagnostics": [
+    {
+      "code": "C1",
+      "severity": "error",
+      "line": 7
+    }
+  ]
+}

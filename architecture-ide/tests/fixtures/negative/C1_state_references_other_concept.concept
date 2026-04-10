@@ -1,0 +1,13 @@
+concept Basket
+
+  purpose
+    hold user items
+
+  state
+    owner: User
+
+  actions
+    add [ item: string ] => [ basket: Basket ]
+
+  operational principle
+    after add [ item: "apple" ] => [ basket: b ]

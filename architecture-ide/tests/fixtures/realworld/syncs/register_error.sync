@@ -1,0 +1,7 @@
+sync RegisterError
+
+  when
+    Web/request: [ ] => [ request: ?request ]
+    User/register: [ ] => [ error: ?error ]
+  then
+    Web/respond: [ request: ?request ; body: ?error ; code: 422 ]

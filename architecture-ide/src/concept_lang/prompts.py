@@ -7,11 +7,11 @@ def register_prompts(mcp: FastMCP) -> None:
     def build_concept(description: str, existing_concepts: str = "") -> list[dict]:
         """
         Iteratively build a concept spec from a natural language description.
-        Optionally pass existing concept names to inform sync/dependency decisions.
+        Optionally pass existing concept names to inform independence checks.
         """
         context = ""
         if existing_concepts:
-            context = f"\n\nExisting concepts in this system: {existing_concepts}"
+            context = f"\n\nExisting concepts in this workspace: {existing_concepts}"
 
         return [
             {
@@ -22,58 +22,83 @@ def register_prompts(mcp: FastMCP) -> None:
 
 {description}{context}
 
-Please help me build a `.concept` spec following Daniel Jackson's concept design methodology.
+Please help me build a `.concept` spec in concept-lang 0.2.0 format (Daniel Jackson's paper-aligned methodology).
 
-A concept has:
-- **name** and optional **type parameters** (e.g. `concept Session [User]`)
-- **purpose**: one sentence stating the essential service this concept provides
-- **state**: typed declarations using `set T` for sets and `A -> set B` for relations
-- **actions**: each with a signature `name (param: Type)`, optional `pre:` conditions and `post:` effects using `+=` and `-=` on sets
-- **sync**: operational composition using when/where/then pattern:
-  - Single-line: `when OtherConcept.action (params) then local_action (params)`
-  - Multi-line with conditions and multiple actions:
-    ```
-    when OtherConcept.action (params) -> result
-      where condition_clause
-      then local_action1 (params)
-           local_action2 (params)
-    ```
+A 0.2.0 concept file has exactly these sections, in order:
 
-Key principles from Jackson:
-1. Each concept must have a **single, independent purpose** — not a grab-bag of features
-2. State should be minimal — only what's needed to define the action semantics
-3. Actions should be **complete**: every action must have well-defined pre/post conditions
-4. Concepts should be **independent**: avoid encoding other concepts' logic in state
+    concept <Name> [<TypeParam>, ...]
 
-Let's work iteratively. Start by proposing a concept name and purpose, then we'll refine state and actions together.""",
+      purpose
+        <one sentence>
+
+      state
+        <field>: <type-expression>
+
+      actions
+        <action_name> [ <in>: <T> ] => [ <out>: <U> ]
+          <natural-language body>
+          effects: <optional += / -= on state>
+
+        <action_name> [ <in>: <T> ] => [ error: string ]
+          <describe the error case>
+
+      operational principle
+        after <action> [...] => [...]
+        and   <action> [...] => [...]
+        then  <action> [...] => [...]
+
+Rules:
+1. Each concept has a single, independent purpose.
+2. Every action has at least one success case AND at least one error case.
+3. No inline sync section — syncs live in separate .sync files now.
+4. Do not reference other concepts in state, effects, or operational principle.
+5. Use `validate_concept` iteratively and `write_concept` to save.
+
+Work iteratively: propose name+purpose first, then state, then action list, then one action at a time, then the operational principle. Validate with `validate_concept` before writing.""",
                 },
             }
         ]
 
     @mcp.prompt()
-    def review_concepts(concept_names: str) -> list[dict]:
+    def review_concepts(concept_names: str = "") -> list[dict]:
         """
-        Review a set of concepts for coherence, independence, and completeness.
-        Pass a comma-separated list of concept names.
+        Review a set of concepts (or the whole workspace) for rule violations
+        and design-quality issues. Pass a comma-separated list of concept names,
+        or leave empty to review the whole workspace.
         """
+        scope = concept_names if concept_names else "the whole workspace"
         return [
             {
                 "role": "user",
                 "content": {
                     "type": "text",
-                    "text": f"""Please review these concepts for design quality: {concept_names}
+                    "text": f"""Please review {scope} for design quality.
 
-Use the `read_concept` tool to load each one, then evaluate:
+1. Call `validate_workspace` and group the diagnostics by rule category:
+   - Independence (C1, C4)
+   - Completeness (C5, C6, C7, C9)
+   - Action cross-references (C2, C3)
+   - Sync (S1, S2, S3, S4, S5)
+   - Parse (P0)
+   Sub-group by file within each category. For diagnostics with
+   line=None or column=None, render as `<file>: <message>` without
+   a position suffix.
 
-1. **Independence**: Does each concept have a single, self-contained purpose? Could it exist without the others?
-2. **Completeness**: Are all actions fully specified with pre/post conditions?
-3. **Minimality**: Is the state model as small as it can be while still supporting all actions?
-4. **Sync coherence**: Are the sync clauses appropriate? Do they represent genuine operational composition or are they papering over a missing concept?
-5. **Naming**: Are concept, action, and state names clear and consistent with the domain?
+2. For each error-severity finding, propose a concrete fix citing
+   the paper's rationale in one sentence.
 
-For each issue found, suggest a specific improvement to the `.concept` source.
+3. Walk the workspace through the three legibility properties from
+   Daniel Jackson's paper:
+   - Incrementality: can each concept be understood on its own?
+   - Integrity: do the actions match the state-machine shape?
+   - Transparency: can the whole system be seen at a glance via
+     `get_workspace_graph`?
 
-Also use `get_dependency_graph` to render the overall concept map and check for unexpected coupling.""",
+4. End with a blocking-issues / warnings / positive-observations
+   summary.
+
+Do not call `get_dependency_graph` (deprecated alias for
+`get_workspace_graph`). Do not touch any app-spec tool.""",
                 },
             }
         ]

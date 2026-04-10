@@ -1,11 +1,13 @@
 """
-Concept diff and evolution tracking.
+Concept diff and evolution tracking (v2 — consumes concept_lang.ast).
 
 Structural diff of concept versions: detect state added/removed/renamed,
-actions changed, sync clauses invalidated. Not text diff — semantic diff
-that understands concept structure.
+actions changed (by case shape), effects changed, operational principle
+changed. The sync section moved out of concepts in 0.2.0 — use
+`diff_syncs(old_sync, new_sync)` on two `SyncAST` values for sync-level
+changes.
 
-Answers: what changed, what syncs are now broken, what downstream concepts
+Answers: what changed, what downstream syncs are broken, what concepts
 are affected. Foundation for safe evolution of concept-based systems.
 """
 
@@ -14,7 +16,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .models import Action, ConceptAST, StateDecl, SyncClause
+from concept_lang.ast import (
+    Action,
+    ActionCase,
+    ConceptAST,
+    OperationalPrinciple,
+    OPStep,
+    StateDecl,
+    SyncAST,
+    Workspace,
+)
 
 
 class ChangeKind(str, Enum):
@@ -28,7 +39,7 @@ class ChangeKind(str, Enum):
 class StateChange:
     kind: ChangeKind
     name: str
-    old_name: str | None = None  # for renames
+    old_name: str | None = None
     old_type_expr: str | None = None
     new_type_expr: str | None = None
 
@@ -47,7 +58,7 @@ class StateChange:
 class ActionChange:
     kind: ChangeKind
     name: str
-    details: list[str] = field(default_factory=list)  # what specifically changed
+    details: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d: dict = {"kind": self.kind.value, "name": self.name}
@@ -57,34 +68,28 @@ class ActionChange:
 
 
 @dataclass
-class SyncChange:
+class OPChange:
+    """A single edit in the operational principle step list."""
     kind: ChangeKind
+    step_index: int
     description: str
-    old_clause: dict | None = None
-    new_clause: dict | None = None
 
     def to_dict(self) -> dict:
-        d: dict = {"kind": self.kind.value, "description": self.description}
-        if self.old_clause:
-            d["old_clause"] = self.old_clause
-        if self.new_clause:
-            d["new_clause"] = self.new_clause
-        return d
+        return {
+            "kind": self.kind.value,
+            "step_index": self.step_index,
+            "description": self.description,
+        }
 
 
 @dataclass
 class BrokenSync:
-    """A sync clause in another concept that is invalidated by this diff."""
-    concept_name: str
-    sync_index: int
+    """A sync in the workspace that is invalidated by a concept diff."""
+    sync_name: str
     reason: str
 
     def to_dict(self) -> dict:
-        return {
-            "concept": self.concept_name,
-            "sync_index": self.sync_index,
-            "reason": self.reason,
-        }
+        return {"sync": self.sync_name, "reason": self.reason}
 
 
 @dataclass
@@ -97,7 +102,7 @@ class ConceptDiff:
     purpose_changed: bool = False
     state_changes: list[StateChange] = field(default_factory=list)
     action_changes: list[ActionChange] = field(default_factory=list)
-    sync_changes: list[SyncChange] = field(default_factory=list)
+    op_changes: list[OPChange] = field(default_factory=list)
     broken_syncs: list[BrokenSync] = field(default_factory=list)
 
     @property
@@ -107,14 +112,11 @@ class ConceptDiff:
             or self.purpose_changed
             or bool(self.state_changes)
             or bool(self.action_changes)
-            or bool(self.sync_changes)
+            or bool(self.op_changes)
         )
 
     def to_dict(self) -> dict:
-        d: dict = {
-            "concept": self.concept_name,
-            "has_changes": self.has_changes,
-        }
+        d: dict = {"concept": self.concept_name, "has_changes": self.has_changes}
         if self.params_changed:
             d["params"] = {"old": self.old_params, "new": self.new_params}
         if self.purpose_changed:
@@ -123,15 +125,37 @@ class ConceptDiff:
             d["state_changes"] = [c.to_dict() for c in self.state_changes]
         if self.action_changes:
             d["action_changes"] = [c.to_dict() for c in self.action_changes]
-        if self.sync_changes:
-            d["sync_changes"] = [c.to_dict() for c in self.sync_changes]
+        if self.op_changes:
+            d["op_changes"] = [c.to_dict() for c in self.op_changes]
         if self.broken_syncs:
             d["broken_syncs"] = [b.to_dict() for b in self.broken_syncs]
         return d
 
 
+@dataclass
+class SyncDiff:
+    """Structural diff between two versions of a single `.sync` file."""
+    sync_name: str
+    when_changed: bool = False
+    where_changed: bool = False
+    then_changed: bool = False
+
+    @property
+    def has_changes(self) -> bool:
+        return self.when_changed or self.where_changed or self.then_changed
+
+    def to_dict(self) -> dict:
+        return {
+            "sync": self.sync_name,
+            "has_changes": self.has_changes,
+            "when_changed": self.when_changed,
+            "where_changed": self.where_changed,
+            "then_changed": self.then_changed,
+        }
+
+
 # ---------------------------------------------------------------------------
-# Diff engine
+# Concept diff
 # ---------------------------------------------------------------------------
 
 
@@ -139,24 +163,19 @@ def diff_concepts(old: ConceptAST, new: ConceptAST) -> ConceptDiff:
     """Compute a structural diff between two versions of a concept."""
     result = ConceptDiff(concept_name=new.name)
 
-    # Params
     if old.params != new.params:
         result.params_changed = True
         result.old_params = old.params
         result.new_params = new.params
 
-    # Purpose
     if old.purpose.strip() != new.purpose.strip():
         result.purpose_changed = True
 
-    # State
     result.state_changes = _diff_state(old.state, new.state)
-
-    # Actions
     result.action_changes = _diff_actions(old.actions, new.actions)
-
-    # Sync
-    result.sync_changes = _diff_syncs(old.sync, new.sync)
+    result.op_changes = _diff_op_principle(
+        old.operational_principle, new.operational_principle
+    )
 
     return result
 
@@ -172,7 +191,7 @@ def _diff_state(old: list[StateDecl], new: list[StateDecl]) -> list[StateChange]
     # Detect renames: same type_expr, one removed + one added
     removed = old_names - new_names
     added = new_names - old_names
-    renamed: set[tuple[str, str]] = set()  # (old_name, new_name)
+    renamed: set[tuple[str, str]] = set()
 
     for r in list(removed):
         for a in list(added):
@@ -205,7 +224,6 @@ def _diff_state(old: list[StateDecl], new: list[StateDecl]) -> list[StateChange]
             new_type_expr=new_by_name[name].type_expr,
         ))
 
-    # Modified: same name, different type_expr
     for name in sorted(old_names & new_names):
         if old_by_name[name].type_expr != new_by_name[name].type_expr:
             changes.append(StateChange(
@@ -242,154 +260,160 @@ def _diff_actions(old: list[Action], new: list[Action]) -> list[ActionChange]:
     return changes
 
 
+def _case_signature(case: ActionCase) -> tuple[str, str]:
+    """Canonical shape of a case's inputs/outputs, ignoring body/effects."""
+    ins = ", ".join(f"{tn.name}: {tn.type_expr}" for tn in case.inputs)
+    outs = ", ".join(f"{tn.name}: {tn.type_expr}" for tn in case.outputs)
+    return (ins, outs)
+
+
 def _compare_action(old: Action, new: Action) -> list[str]:
     details: list[str] = []
-    if old.params != new.params:
-        details.append(f"params: {old.params} -> {new.params}")
 
-    old_pre = old.pre.clauses if old.pre else []
-    new_pre = new.pre.clauses if new.pre else []
-    if old_pre != new_pre:
-        details.append("pre conditions changed")
+    if len(old.cases) != len(new.cases):
+        details.append(f"case count: {len(old.cases)} -> {len(new.cases)}")
+        return details
 
-    old_post = old.post.clauses if old.post else []
-    new_post = new.post.clauses if new.post else []
-    if old_post != new_post:
-        details.append("post conditions changed")
+    for idx, (oc, nc) in enumerate(zip(old.cases, new.cases)):
+        old_sig = _case_signature(oc)
+        new_sig = _case_signature(nc)
+        if old_sig != new_sig:
+            details.append(
+                f"case {idx} signature: ({old_sig[0]}) => ({old_sig[1]}) "
+                f"-> ({new_sig[0]}) => ({new_sig[1]})"
+            )
+            continue
+
+        old_effects = [e.raw for e in oc.effects]
+        new_effects = [e.raw for e in nc.effects]
+        if old_effects != new_effects:
+            details.append(f"case {idx} effects changed")
+
+        if oc.body != nc.body:
+            details.append(f"case {idx} body changed")
 
     return details
 
 
-def _sync_key(clause: SyncClause) -> str:
-    """Create a structural key for matching sync clauses across versions."""
-    return f"{clause.trigger_concept}.{clause.trigger_action}"
+def _diff_op_principle(
+    old: OperationalPrinciple, new: OperationalPrinciple
+) -> list[OPChange]:
+    """Coarse diff: per-step index, report added / removed / modified."""
+    changes: list[OPChange] = []
+    n_old = len(old.steps)
+    n_new = len(new.steps)
+    common = min(n_old, n_new)
 
-
-def _sync_summary(clause: SyncClause) -> dict:
-    return {
-        "trigger": f"{clause.trigger_concept}.{clause.trigger_action}",
-        "params": clause.trigger_params,
-        "invocations": [f"{inv.action}({', '.join(inv.params)})" for inv in clause.invocations],
-    }
-
-
-def _diff_syncs(old: list[SyncClause], new: list[SyncClause]) -> list[SyncChange]:
-    changes: list[SyncChange] = []
-
-    # Group by trigger key for matching
-    old_by_key: dict[str, list[SyncClause]] = {}
-    for c in old:
-        old_by_key.setdefault(_sync_key(c), []).append(c)
-
-    new_by_key: dict[str, list[SyncClause]] = {}
-    for c in new:
-        new_by_key.setdefault(_sync_key(c), []).append(c)
-
-    old_keys = set(old_by_key)
-    new_keys = set(new_by_key)
-
-    for key in sorted(old_keys - new_keys):
-        for clause in old_by_key[key]:
-            changes.append(SyncChange(
-                kind=ChangeKind.REMOVED,
-                description=f"Removed sync on {key}",
-                old_clause=_sync_summary(clause),
-            ))
-
-    for key in sorted(new_keys - old_keys):
-        for clause in new_by_key[key]:
-            changes.append(SyncChange(
-                kind=ChangeKind.ADDED,
-                description=f"Added sync on {key}",
-                new_clause=_sync_summary(clause),
-            ))
-
-    for key in sorted(old_keys & new_keys):
-        old_clauses = old_by_key[key]
-        new_clauses = new_by_key[key]
-        # Compare each pair; if counts differ or content differs, mark modified
-        if len(old_clauses) != len(new_clauses):
-            changes.append(SyncChange(
+    for idx in range(common):
+        if _op_step_differs(old.steps[idx], new.steps[idx]):
+            changes.append(OPChange(
                 kind=ChangeKind.MODIFIED,
-                description=f"Changed sync count on {key}: {len(old_clauses)} -> {len(new_clauses)}",
+                step_index=idx,
+                description=(
+                    f"step {idx}: {old.steps[idx].keyword} "
+                    f"{old.steps[idx].action_name} changed"
+                ),
             ))
-        else:
-            for oc, nc in zip(old_clauses, new_clauses):
-                if _syncs_differ(oc, nc):
-                    changes.append(SyncChange(
-                        kind=ChangeKind.MODIFIED,
-                        description=f"Modified sync on {key}",
-                        old_clause=_sync_summary(oc),
-                        new_clause=_sync_summary(nc),
-                    ))
+
+    for idx in range(common, n_old):
+        changes.append(OPChange(
+            kind=ChangeKind.REMOVED,
+            step_index=idx,
+            description=f"step {idx}: {old.steps[idx].action_name} removed",
+        ))
+
+    for idx in range(common, n_new):
+        changes.append(OPChange(
+            kind=ChangeKind.ADDED,
+            step_index=idx,
+            description=f"step {idx}: {new.steps[idx].action_name} added",
+        ))
 
     return changes
 
 
-def _syncs_differ(a: SyncClause, b: SyncClause) -> bool:
-    if a.trigger_params != b.trigger_params:
-        return True
-    if a.trigger_result != b.trigger_result:
-        return True
-    if a.where_clauses != b.where_clauses:
-        return True
-    if len(a.invocations) != len(b.invocations):
-        return True
-    for ai, bi in zip(a.invocations, b.invocations):
-        if ai.action != bi.action or ai.params != bi.params:
-            return True
-    return False
+def _op_step_differs(a: OPStep, b: OPStep) -> bool:
+    return (
+        a.keyword != b.keyword
+        or a.action_name != b.action_name
+        or a.inputs != b.inputs
+        or a.outputs != b.outputs
+    )
 
 
 # ---------------------------------------------------------------------------
-# Impact analysis: find broken syncs in downstream concepts
+# Sync diff
+# ---------------------------------------------------------------------------
+
+
+def diff_syncs(old: SyncAST, new: SyncAST) -> SyncDiff:
+    """Compute a structural diff between two versions of a sync."""
+    result = SyncDiff(sync_name=new.name)
+
+    if [p.model_dump() for p in old.when] != [p.model_dump() for p in new.when]:
+        result.when_changed = True
+    if [p.model_dump() for p in old.then] != [p.model_dump() for p in new.then]:
+        result.then_changed = True
+
+    old_where = old.where.model_dump() if old.where else None
+    new_where = new.where.model_dump() if new.where else None
+    if old_where != new_where:
+        result.where_changed = True
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Impact analysis: find broken syncs in the workspace
 # ---------------------------------------------------------------------------
 
 
 def find_broken_syncs(
     diff: ConceptDiff,
-    workspace: list[ConceptAST],
+    workspace: Workspace,
 ) -> list[BrokenSync]:
-    """Given a diff of one concept, find sync clauses in other concepts
-    that are now broken by the changes."""
+    """
+    Given a diff of one concept, find syncs in the workspace that are
+    now broken by the changes.
+    """
     broken: list[BrokenSync] = []
     concept_name = diff.concept_name
 
-    # Build sets of removed/renamed actions
     removed_actions: set[str] = set()
-    renamed_actions: dict[str, str] = {}  # old_name -> new_name (not used yet)
-    modified_action_params: set[str] = set()
+    modified_action_cases: set[str] = set()
 
     for ac in diff.action_changes:
         if ac.kind == ChangeKind.REMOVED:
             removed_actions.add(ac.name)
         elif ac.kind == ChangeKind.MODIFIED:
-            if any("params:" in d for d in ac.details):
-                modified_action_params.add(ac.name)
+            if any("signature" in d for d in ac.details):
+                modified_action_cases.add(ac.name)
 
-    # Check all concepts in workspace for syncs that trigger on the changed concept
-    for ast in workspace:
-        if ast.name == concept_name:
-            continue
-        for idx, clause in enumerate(ast.sync):
-            if clause.trigger_concept != concept_name:
+    for sync_name, sync in workspace.syncs.items():
+        # Check every action pattern in when/then for references to
+        # Concept/action where Concept == concept_name.
+        all_patterns = list(sync.when) + list(sync.then)
+        for pat in all_patterns:
+            if pat.concept != concept_name:
                 continue
-
-            if clause.trigger_action in removed_actions:
+            if pat.action in removed_actions:
                 broken.append(BrokenSync(
-                    concept_name=ast.name,
-                    sync_index=idx,
-                    reason=f"Action '{clause.trigger_action}' was removed from '{concept_name}'",
-                ))
-            elif clause.trigger_action in modified_action_params:
-                broken.append(BrokenSync(
-                    concept_name=ast.name,
-                    sync_index=idx,
+                    sync_name=sync_name,
                     reason=(
-                        f"Action '{clause.trigger_action}' in '{concept_name}' "
-                        f"had its parameters changed"
+                        f"Action '{pat.action}' was removed from "
+                        f"'{concept_name}'"
                     ),
                 ))
+                break
+            if pat.action in modified_action_cases:
+                broken.append(BrokenSync(
+                    sync_name=sync_name,
+                    reason=(
+                        f"Action '{pat.action}' in '{concept_name}' "
+                        f"had its case signature changed"
+                    ),
+                ))
+                break
 
     return broken
 
@@ -397,10 +421,10 @@ def find_broken_syncs(
 def diff_concepts_with_impact(
     old: ConceptAST,
     new: ConceptAST,
-    workspace: list[ConceptAST] | None = None,
+    workspace: Workspace | None = None,
 ) -> ConceptDiff:
     """Diff two concept versions and optionally find broken downstream syncs."""
     result = diff_concepts(old, new)
-    if workspace:
+    if workspace is not None:
         result.broken_syncs = find_broken_syncs(result, workspace)
     return result

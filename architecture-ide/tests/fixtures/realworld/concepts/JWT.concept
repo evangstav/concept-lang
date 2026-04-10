@@ -1,0 +1,26 @@
+concept JWT [U]
+
+  purpose
+    mint and verify bearer tokens that identify users
+
+  state
+    tokens: set string
+    token: U -> string
+
+  actions
+    generate [ user: U ] => [ token: string ]
+      mint a fresh signed token for the user
+      effects:
+        tokens += token
+        token[user] := token
+
+    verify [ token: string ] => [ user: U ]
+      validate the token signature and return the identified user
+
+    verify [ token: string ] => [ error: string ]
+      if the token is missing malformed or expired
+      return the error description
+
+  operational principle
+    after generate [ user: x ] => [ token: t ]
+    then verify [ token: t ] => [ user: x ]

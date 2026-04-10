@@ -1,0 +1,8 @@
+sync RegisterUser
+
+  when
+    Web/request: [ method: "register" ; username: ?username ; email: ?email ] => [ request: ?request ]
+  where
+    bind (uuid() as ?user)
+  then
+    User/register: [ user: ?user ; name: ?username ; email: ?email ]

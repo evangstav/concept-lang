@@ -1,14 +1,30 @@
-"""Tests for concept diff and evolution tracking."""
+"""Tests for concept diff and evolution tracking (v2 — consumes concept_lang.ast)."""
 
-import pytest
-from concept_lang.models import (
-    Action, ConceptAST, PrePost, StateDecl, SyncClause, SyncInvocation,
+from concept_lang.ast import (
+    Action,
+    ActionCase,
+    ActionPattern,
+    ConceptAST,
+    OperationalPrinciple,
+    OPStep,
+    StateDecl,
+    SyncAST,
+    TypedName,
+    Workspace,
 )
 from concept_lang.diff import (
-    ChangeKind, ConceptDiff, diff_concepts, diff_concepts_with_impact,
+    ChangeKind,
+    ConceptDiff,
+    SyncDiff,
+    diff_concepts,
+    diff_concepts_with_impact,
+    diff_syncs,
     find_broken_syncs,
 )
-from concept_lang.parser import parse_concept
+
+
+def _empty_op() -> OperationalPrinciple:
+    return OperationalPrinciple(steps=[])
 
 
 def _make_concept(
@@ -16,7 +32,7 @@ def _make_concept(
     params: list[str] | None = None,
     state: list[StateDecl] | None = None,
     actions: list[Action] | None = None,
-    sync: list[SyncClause] | None = None,
+    op: OperationalPrinciple | None = None,
     purpose: str = "test concept",
 ) -> ConceptAST:
     return ConceptAST(
@@ -25,9 +41,18 @@ def _make_concept(
         purpose=purpose,
         state=state or [],
         actions=actions or [],
-        sync=sync or [],
+        operational_principle=op or _empty_op(),
         source="",
     )
+
+
+def _single_case_action(name: str, ins: list[tuple[str, str]], outs: list[tuple[str, str]]) -> Action:
+    case = ActionCase(
+        inputs=[TypedName(name=n, type_expr=t) for n, t in ins],
+        outputs=[TypedName(name=n, type_expr=t) for n, t in outs],
+        body=[],
+    )
+    return Action(name=name, cases=[case])
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +64,7 @@ class TestNoChanges:
     def test_identical_concepts(self):
         c = _make_concept(
             state=[StateDecl(name="items", type_expr="set Item")],
-            actions=[Action(name="add", params=["x: Item"])],
+            actions=[_single_case_action("add", [("x", "Item")], [("x", "Item")])],
         )
         diff = diff_concepts(c, c)
         assert not diff.has_changes
@@ -59,22 +84,22 @@ class TestNoChanges:
 
 class TestParamChanges:
     def test_params_added(self):
-        old = _make_concept(params=["User"])
-        new = _make_concept(params=["User", "Resource"])
+        old = _make_concept(params=["U"])
+        new = _make_concept(params=["U", "R"])
         diff = diff_concepts(old, new)
         assert diff.params_changed
-        assert diff.old_params == ["User"]
-        assert diff.new_params == ["User", "Resource"]
+        assert diff.old_params == ["U"]
+        assert diff.new_params == ["U", "R"]
 
     def test_params_removed(self):
-        old = _make_concept(params=["User", "Resource"])
-        new = _make_concept(params=["User"])
+        old = _make_concept(params=["U", "R"])
+        new = _make_concept(params=["U"])
         diff = diff_concepts(old, new)
         assert diff.params_changed
 
     def test_params_unchanged(self):
-        old = _make_concept(params=["User"])
-        new = _make_concept(params=["User"])
+        old = _make_concept(params=["U"])
+        new = _make_concept(params=["U"])
         diff = diff_concepts(old, new)
         assert not diff.params_changed
 
@@ -85,15 +110,15 @@ class TestParamChanges:
 
 
 class TestPurposeChanges:
-    def test_purpose_changed(self):
-        old = _make_concept(purpose="old purpose")
-        new = _make_concept(purpose="new purpose")
+    def test_purpose_edit(self):
+        old = _make_concept(purpose="old")
+        new = _make_concept(purpose="new")
         diff = diff_concepts(old, new)
         assert diff.purpose_changed
 
-    def test_purpose_whitespace_ignored(self):
-        old = _make_concept(purpose="same purpose  ")
-        new = _make_concept(purpose="  same purpose")
+    def test_purpose_whitespace_only_ignored(self):
+        old = _make_concept(purpose="hello")
+        new = _make_concept(purpose="  hello  ")
         diff = diff_concepts(old, new)
         assert not diff.purpose_changed
 
@@ -105,64 +130,36 @@ class TestPurposeChanges:
 
 class TestStateChanges:
     def test_state_added(self):
-        old = _make_concept(state=[StateDecl(name="items", type_expr="set Item")])
-        new = _make_concept(state=[
-            StateDecl(name="items", type_expr="set Item"),
-            StateDecl(name="active", type_expr="items"),
-        ])
-        diff = diff_concepts(old, new)
-        assert len(diff.state_changes) == 1
-        sc = diff.state_changes[0]
-        assert sc.kind == ChangeKind.ADDED
-        assert sc.name == "active"
-        assert sc.new_type_expr == "items"
-
-    def test_state_removed(self):
-        old = _make_concept(state=[
-            StateDecl(name="items", type_expr="set Item"),
-            StateDecl(name="active", type_expr="items"),
-        ])
+        old = _make_concept()
         new = _make_concept(state=[StateDecl(name="items", type_expr="set Item")])
         diff = diff_concepts(old, new)
         assert len(diff.state_changes) == 1
-        sc = diff.state_changes[0]
-        assert sc.kind == ChangeKind.REMOVED
-        assert sc.name == "active"
+        assert diff.state_changes[0].kind == ChangeKind.ADDED
+        assert diff.state_changes[0].name == "items"
 
-    def test_state_modified(self):
+    def test_state_removed(self):
         old = _make_concept(state=[StateDecl(name="items", type_expr="set Item")])
-        new = _make_concept(state=[StateDecl(name="items", type_expr="set Resource")])
+        new = _make_concept()
         diff = diff_concepts(old, new)
-        assert len(diff.state_changes) == 1
-        sc = diff.state_changes[0]
-        assert sc.kind == ChangeKind.MODIFIED
-        assert sc.old_type_expr == "set Item"
-        assert sc.new_type_expr == "set Resource"
+        assert diff.state_changes[0].kind == ChangeKind.REMOVED
+
+    def test_state_type_modified(self):
+        old = _make_concept(state=[StateDecl(name="items", type_expr="set Item")])
+        new = _make_concept(state=[StateDecl(name="items", type_expr="set OtherItem")])
+        diff = diff_concepts(old, new)
+        assert diff.state_changes[0].kind == ChangeKind.MODIFIED
+        assert diff.state_changes[0].old_type_expr == "set Item"
+        assert diff.state_changes[0].new_type_expr == "set OtherItem"
 
     def test_state_renamed(self):
-        """Same type_expr, old name removed, new name added -> rename."""
-        old = _make_concept(state=[StateDecl(name="members", type_expr="set User")])
-        new = _make_concept(state=[StateDecl(name="users", type_expr="set User")])
+        """Same type_expr but different name → detected as rename."""
+        old = _make_concept(state=[StateDecl(name="items", type_expr="set Item")])
+        new = _make_concept(state=[StateDecl(name="records", type_expr="set Item")])
         diff = diff_concepts(old, new)
-        assert len(diff.state_changes) == 1
-        sc = diff.state_changes[0]
-        assert sc.kind == ChangeKind.RENAMED
-        assert sc.name == "users"
-        assert sc.old_name == "members"
-
-    def test_multiple_state_changes(self):
-        old = _make_concept(state=[
-            StateDecl(name="items", type_expr="set Item"),
-            StateDecl(name="active", type_expr="items"),
-        ])
-        new = _make_concept(state=[
-            StateDecl(name="items", type_expr="set Item"),
-            StateDecl(name="archived", type_expr="items"),
-        ])
-        diff = diff_concepts(old, new)
-        # 'active' renamed to 'archived' (same type_expr "items")
         assert len(diff.state_changes) == 1
         assert diff.state_changes[0].kind == ChangeKind.RENAMED
+        assert diff.state_changes[0].old_name == "items"
+        assert diff.state_changes[0].name == "records"
 
 
 # ---------------------------------------------------------------------------
@@ -172,296 +169,182 @@ class TestStateChanges:
 
 class TestActionChanges:
     def test_action_added(self):
-        old = _make_concept(actions=[Action(name="add", params=["x: Item"])])
-        new = _make_concept(actions=[
-            Action(name="add", params=["x: Item"]),
-            Action(name="remove", params=["x: Item"]),
-        ])
+        old = _make_concept()
+        new = _make_concept(actions=[_single_case_action("add", [], [])])
         diff = diff_concepts(old, new)
-        assert len(diff.action_changes) == 1
-        ac = diff.action_changes[0]
-        assert ac.kind == ChangeKind.ADDED
-        assert ac.name == "remove"
+        assert diff.action_changes[0].kind == ChangeKind.ADDED
+        assert diff.action_changes[0].name == "add"
 
     def test_action_removed(self):
-        old = _make_concept(actions=[
-            Action(name="add", params=["x: Item"]),
-            Action(name="remove", params=["x: Item"]),
-        ])
-        new = _make_concept(actions=[Action(name="add", params=["x: Item"])])
-        diff = diff_concepts(old, new)
-        assert len(diff.action_changes) == 1
-        assert diff.action_changes[0].kind == ChangeKind.REMOVED
-        assert diff.action_changes[0].name == "remove"
-
-    def test_action_params_changed(self):
-        old = _make_concept(actions=[Action(name="add", params=["x: Item"])])
-        new = _make_concept(actions=[Action(name="add", params=["x: Item", "y: Tag"])])
-        diff = diff_concepts(old, new)
-        assert len(diff.action_changes) == 1
-        ac = diff.action_changes[0]
-        assert ac.kind == ChangeKind.MODIFIED
-        assert any("params:" in d for d in ac.details)
-
-    def test_action_pre_changed(self):
-        old = _make_concept(actions=[Action(
-            name="add", params=["x: Item"],
-            pre=PrePost(clauses=["x not in items"]),
-        )])
-        new = _make_concept(actions=[Action(
-            name="add", params=["x: Item"],
-            pre=PrePost(clauses=["x not in items", "x not in archived"]),
-        )])
-        diff = diff_concepts(old, new)
-        assert len(diff.action_changes) == 1
-        assert any("pre" in d for d in diff.action_changes[0].details)
-
-    def test_action_post_changed(self):
-        old = _make_concept(actions=[Action(
-            name="add", params=["x: Item"],
-            post=PrePost(clauses=["items += x"]),
-        )])
-        new = _make_concept(actions=[Action(
-            name="add", params=["x: Item"],
-            post=PrePost(clauses=["items += x", "active += x"]),
-        )])
-        diff = diff_concepts(old, new)
-        assert len(diff.action_changes) == 1
-        assert any("post" in d for d in diff.action_changes[0].details)
-
-
-# ---------------------------------------------------------------------------
-# Sync changes
-# ---------------------------------------------------------------------------
-
-
-class TestSyncChanges:
-    def test_sync_added(self):
-        old = _make_concept()
-        new = _make_concept(sync=[SyncClause(
-            trigger_concept="Auth",
-            trigger_action="login",
-            trigger_params=["u"],
-            invocations=[SyncInvocation(action="open", params=["u"])],
-        )])
-        diff = diff_concepts(old, new)
-        assert len(diff.sync_changes) == 1
-        assert diff.sync_changes[0].kind == ChangeKind.ADDED
-
-    def test_sync_removed(self):
-        old = _make_concept(sync=[SyncClause(
-            trigger_concept="Auth",
-            trigger_action="login",
-            trigger_params=["u"],
-            invocations=[SyncInvocation(action="open", params=["u"])],
-        )])
+        old = _make_concept(actions=[_single_case_action("add", [], [])])
         new = _make_concept()
         diff = diff_concepts(old, new)
-        assert len(diff.sync_changes) == 1
-        assert diff.sync_changes[0].kind == ChangeKind.REMOVED
+        assert diff.action_changes[0].kind == ChangeKind.REMOVED
 
-    def test_sync_modified_params(self):
-        old = _make_concept(sync=[SyncClause(
-            trigger_concept="Auth",
-            trigger_action="login",
-            trigger_params=["u"],
-            invocations=[SyncInvocation(action="open", params=["u"])],
-        )])
-        new = _make_concept(sync=[SyncClause(
-            trigger_concept="Auth",
-            trigger_action="login",
-            trigger_params=["u", "s"],
-            invocations=[SyncInvocation(action="open", params=["u", "s"])],
-        )])
+    def test_action_signature_modified(self):
+        old = _make_concept(actions=[_single_case_action("add", [("x", "Item")], [])])
+        new = _make_concept(actions=[_single_case_action("add", [("x", "Widget")], [])])
         diff = diff_concepts(old, new)
-        assert len(diff.sync_changes) == 1
-        assert diff.sync_changes[0].kind == ChangeKind.MODIFIED
+        assert diff.action_changes[0].kind == ChangeKind.MODIFIED
+        assert any("signature" in d for d in diff.action_changes[0].details)
 
-    def test_sync_unchanged(self):
-        clause = SyncClause(
-            trigger_concept="Auth",
-            trigger_action="login",
-            trigger_params=["u"],
-            invocations=[SyncInvocation(action="open", params=["u"])],
+    def test_action_case_count_changed(self):
+        old_action = _single_case_action("add", [], [])
+        extra = ActionCase(
+            inputs=[],
+            outputs=[TypedName(name="error", type_expr="string")],
+            body=["error case"],
         )
-        old = _make_concept(sync=[clause])
-        new = _make_concept(sync=[clause])
+        new_action = Action(name="add", cases=[old_action.cases[0], extra])
+        old = _make_concept(actions=[old_action])
+        new = _make_concept(actions=[new_action])
         diff = diff_concepts(old, new)
-        assert len(diff.sync_changes) == 0
+        assert diff.action_changes[0].kind == ChangeKind.MODIFIED
+        assert any("case count" in d for d in diff.action_changes[0].details)
 
 
 # ---------------------------------------------------------------------------
-# Broken sync detection (impact analysis)
+# Operational principle changes
 # ---------------------------------------------------------------------------
 
 
-class TestBrokenSyncs:
-    def test_removed_action_breaks_downstream(self):
-        auth_old = _make_concept(
+class TestOPChanges:
+    def test_op_step_added(self):
+        old = _make_concept()
+        new_op = OperationalPrinciple(steps=[
+            OPStep(
+                keyword="after",
+                action_name="add",
+                inputs=[("x", "x1")],
+                outputs=[],
+            ),
+        ])
+        new = _make_concept(op=new_op)
+        diff = diff_concepts(old, new)
+        assert len(diff.op_changes) == 1
+        assert diff.op_changes[0].kind == ChangeKind.ADDED
+        assert diff.op_changes[0].step_index == 0
+
+    def test_op_step_modified(self):
+        old_op = OperationalPrinciple(steps=[
+            OPStep(keyword="after", action_name="add", inputs=[("x", "x1")], outputs=[]),
+        ])
+        new_op = OperationalPrinciple(steps=[
+            OPStep(keyword="after", action_name="add", inputs=[("x", "x2")], outputs=[]),
+        ])
+        diff = diff_concepts(_make_concept(op=old_op), _make_concept(op=new_op))
+        assert len(diff.op_changes) == 1
+        assert diff.op_changes[0].kind == ChangeKind.MODIFIED
+
+    def test_op_step_removed(self):
+        old_op = OperationalPrinciple(steps=[
+            OPStep(keyword="after", action_name="add", inputs=[], outputs=[]),
+        ])
+        diff = diff_concepts(_make_concept(op=old_op), _make_concept())
+        assert diff.op_changes[0].kind == ChangeKind.REMOVED
+
+
+# ---------------------------------------------------------------------------
+# Sync diff
+# ---------------------------------------------------------------------------
+
+
+def _pat(concept: str, action: str) -> ActionPattern:
+    return ActionPattern(
+        concept=concept,
+        action=action,
+        input_pattern=[],
+        output_pattern=[],
+    )
+
+
+class TestSyncDiff:
+    def test_identical_syncs_no_changes(self):
+        s = SyncAST(
+            name="Hello",
+            when=[_pat("A", "do")],
+            where=None,
+            then=[_pat("B", "do")],
+            source="",
+        )
+        d = diff_syncs(s, s)
+        assert not d.has_changes
+
+    def test_when_changed(self):
+        old = SyncAST(name="Hello", when=[_pat("A", "do")], then=[_pat("B", "do")], source="")
+        new = SyncAST(name="Hello", when=[_pat("A", "other")], then=[_pat("B", "do")], source="")
+        d = diff_syncs(old, new)
+        assert d.when_changed
+        assert not d.then_changed
+
+    def test_then_changed(self):
+        old = SyncAST(name="Hello", when=[_pat("A", "do")], then=[_pat("B", "do")], source="")
+        new = SyncAST(name="Hello", when=[_pat("A", "do")], then=[_pat("C", "do")], source="")
+        d = diff_syncs(old, new)
+        assert d.then_changed
+
+
+# ---------------------------------------------------------------------------
+# Impact analysis
+# ---------------------------------------------------------------------------
+
+
+class TestImpactAnalysis:
+    def test_action_removal_breaks_downstream_sync(self):
+        old_concept = _make_concept(
             name="Auth",
             actions=[
-                Action(name="login", params=["u: User"]),
-                Action(name="logout", params=["u: User"]),
+                _single_case_action("login", [("u", "User")], [("u", "User")]),
+                _single_case_action("logout", [("u", "User")], []),
             ],
         )
-        auth_new = _make_concept(
+        new_concept = _make_concept(
             name="Auth",
-            actions=[Action(name="logout", params=["u: User"])],
+            actions=[_single_case_action("login", [("u", "User")], [("u", "User")])],
         )
-        session = _make_concept(
-            name="Session",
-            actions=[Action(name="open", params=["u: User"])],
-            sync=[SyncClause(
-                trigger_concept="Auth",
-                trigger_action="login",
-                trigger_params=["u"],
-                invocations=[SyncInvocation(action="open", params=["u"])],
-            )],
+        sync = SyncAST(
+            name="OnLogout",
+            when=[_pat("Auth", "logout")],
+            where=None,
+            then=[_pat("Session", "close")],
+            source="",
         )
-        diff = diff_concepts_with_impact(auth_old, auth_new, [auth_new, session])
+        ws = Workspace(concepts={"Auth": new_concept}, syncs={"OnLogout": sync})
+
+        diff = diff_concepts_with_impact(old_concept, new_concept, ws)
         assert len(diff.broken_syncs) == 1
-        assert diff.broken_syncs[0].concept_name == "Session"
-        assert "removed" in diff.broken_syncs[0].reason
+        assert diff.broken_syncs[0].sync_name == "OnLogout"
+        assert "logout" in diff.broken_syncs[0].reason
 
-    def test_modified_action_params_breaks_downstream(self):
-        auth_old = _make_concept(
+    def test_unrelated_sync_not_broken(self):
+        old = _make_concept(name="Auth", actions=[_single_case_action("login", [], [])])
+        new = _make_concept(name="Auth")
+        sync = SyncAST(
+            name="Unrelated",
+            when=[_pat("Other", "foo")],
+            then=[_pat("Other", "bar")],
+            source="",
+        )
+        ws = Workspace(concepts={"Auth": new}, syncs={"Unrelated": sync})
+        diff = diff_concepts_with_impact(old, new, ws)
+        assert diff.broken_syncs == []
+
+    def test_signature_change_breaks_downstream(self):
+        old = _make_concept(
             name="Auth",
-            actions=[Action(name="login", params=["u: User"])],
+            actions=[_single_case_action("login", [("u", "User")], [])],
         )
-        auth_new = _make_concept(
+        new = _make_concept(
             name="Auth",
-            actions=[Action(name="login", params=["u: User", "token: Token"])],
+            actions=[_single_case_action("login", [("u", "Admin")], [])],
         )
-        session = _make_concept(
-            name="Session",
-            actions=[Action(name="open", params=["u: User"])],
-            sync=[SyncClause(
-                trigger_concept="Auth",
-                trigger_action="login",
-                trigger_params=["u"],
-                invocations=[SyncInvocation(action="open", params=["u"])],
-            )],
+        sync = SyncAST(
+            name="OnLogin",
+            when=[_pat("Auth", "login")],
+            then=[_pat("Session", "open")],
+            source="",
         )
-        diff = diff_concepts_with_impact(auth_old, auth_new, [auth_new, session])
+        ws = Workspace(concepts={"Auth": new}, syncs={"OnLogin": sync})
+        diff = diff_concepts_with_impact(old, new, ws)
         assert len(diff.broken_syncs) == 1
-        assert "parameters changed" in diff.broken_syncs[0].reason
-
-    def test_unrelated_change_no_breakage(self):
-        auth_old = _make_concept(
-            name="Auth",
-            actions=[Action(name="login", params=["u: User"])],
-        )
-        auth_new = _make_concept(
-            name="Auth",
-            actions=[
-                Action(name="login", params=["u: User"]),
-                Action(name="reset", params=["u: User"]),
-            ],
-        )
-        session = _make_concept(
-            name="Session",
-            actions=[Action(name="open", params=["u: User"])],
-            sync=[SyncClause(
-                trigger_concept="Auth",
-                trigger_action="login",
-                trigger_params=["u"],
-                invocations=[SyncInvocation(action="open", params=["u"])],
-            )],
-        )
-        diff = diff_concepts_with_impact(auth_old, auth_new, [auth_new, session])
-        assert len(diff.broken_syncs) == 0
-
-    def test_no_workspace_no_broken(self):
-        old = _make_concept(actions=[Action(name="login", params=["u: User"])])
-        new = _make_concept(actions=[])
-        diff = diff_concepts_with_impact(old, new)
-        assert len(diff.broken_syncs) == 0
-
-
-# ---------------------------------------------------------------------------
-# Integration: parse real concept source and diff
-# ---------------------------------------------------------------------------
-
-
-class TestIntegration:
-    CONCEPT_V1 = """\
-concept Auth [User]
-  purpose
-    Manage user authentication
-
-  state
-    registered: set User
-    active: registered
-
-  actions
-    register (u: User)
-      pre: u not in registered
-      post: registered += u
-
-    login (u: User)
-      pre: u in registered
-      post: active += u
-
-    logout (u: User)
-      pre: u in active
-      post: active -= u
-"""
-
-    CONCEPT_V2 = """\
-concept Auth [User]
-  purpose
-    Manage user authentication with tokens
-
-  state
-    registered: set User
-    active: registered
-    tokens: registered -> set Token
-
-  actions
-    register (u: User)
-      pre: u not in registered
-      post: registered += u
-
-    login (u: User, t: Token)
-      pre: u in registered
-      post: active += u
-            tokens[u] += t
-
-    logout (u: User)
-      pre: u in active
-      post: active -= u
-            tokens -= u->
-"""
-
-    def test_full_evolution(self):
-        old = parse_concept(self.CONCEPT_V1)
-        new = parse_concept(self.CONCEPT_V2)
-        diff = diff_concepts(old, new)
-
-        assert diff.has_changes
-        assert diff.purpose_changed
-
-        # State: 'tokens' added
-        state_adds = [s for s in diff.state_changes if s.kind == ChangeKind.ADDED]
-        assert len(state_adds) == 1
-        assert state_adds[0].name == "tokens"
-
-        # Actions: 'login' modified (params + post), 'logout' modified (post)
-        action_mods = [a for a in diff.action_changes if a.kind == ChangeKind.MODIFIED]
-        assert len(action_mods) == 2
-        login_mod = next(a for a in action_mods if a.name == "login")
-        assert any("params:" in d for d in login_mod.details)
-        assert any("post" in d for d in login_mod.details)
-        logout_mod = next(a for a in action_mods if a.name == "logout")
-        assert any("post" in d for d in logout_mod.details)
-
-    def test_to_dict_roundtrip(self):
-        old = parse_concept(self.CONCEPT_V1)
-        new = parse_concept(self.CONCEPT_V2)
-        diff = diff_concepts(old, new)
-        d = diff.to_dict()
-
-        assert d["concept"] == "Auth"
-        assert d["has_changes"] is True
-        assert "state_changes" in d
-        assert "action_changes" in d
+        assert "signature" in diff.broken_syncs[0].reason or "case" in diff.broken_syncs[0].reason

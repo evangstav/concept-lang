@@ -1,0 +1,53 @@
+// concept-lang 0.2.0 — sync grammar (when + where + then)
+// See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.2.
+
+start: sync_def
+
+sync_def: "sync" NAME when_clause where_clause? then_clause
+
+when_clause: "when" action_pattern+
+then_clause: "then" action_pattern+
+where_clause: "where" where_item+
+
+where_item: state_query | optional_query | bind_clause
+
+state_query: NAME ":" "{" triple_list "}"
+optional_query: "optional" NAME ":" "{" triple_list "}"
+
+// A triple_list has one full triple followed by any number of
+// predicate_only continuations that implicitly share the first
+// triple's subject.
+triple_list: triple (";" predicate_only)*
+triple: VAR NAME ":" (VAR | LITERAL)
+predicate_only: NAME ":" (VAR | LITERAL)
+
+bind_clause: "bind" "(" BIND_EXPR "as" VAR ")"
+// BIND_EXPR lazily matches everything up to (but not including) the
+// literal ` as ` token (note the spaces — that's how we stop before
+// the `as ?var` tail without greedy-eating it). The non-greedy `.+?`
+// allows arbitrary characters including `)` from nested calls like
+// `uuid()` because the lookahead pins the stop position.
+//
+// NOTE: The plan originally proposed `BIND_EXPR: /[^)]+?(?= as )/`,
+// but that excluded `)` via the negated character class — which broke
+// on any bind expression containing nested parentheses such as
+// `bind (uuid() as ?user)`. Using `.+?` instead lets the non-greedy
+// quantifier traverse parens; the `(?= as )` lookahead still anchors
+// the match boundary before the `as ?var` tail. Known fragility: a
+// bind expression that itself contains the substring ` as ` (with
+// spaces on both sides) would mis-tokenize. P1 has no such test.
+BIND_EXPR: /.+?(?= as )/
+
+action_pattern: NAME "/" NAME ":" pattern_list ("=>" pattern_list)?
+pattern_list: "[" (pattern_field (";" pattern_field)*)? "]"
+pattern_field: NAME ":" pattern_value
+pattern_value: VAR | LITERAL
+
+VAR: /\?[A-Za-z_][A-Za-z0-9_]*/
+LITERAL: /"[^"]*"|[0-9]+|true|false/
+NAME: /[A-Za-z_][A-Za-z0-9_]*/
+
+%import common.NEWLINE
+%import common.WS_INLINE
+%ignore NEWLINE
+%ignore WS_INLINE

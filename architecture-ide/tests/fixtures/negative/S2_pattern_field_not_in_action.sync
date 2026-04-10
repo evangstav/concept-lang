@@ -1,0 +1,6 @@
+sync BadSync
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Log/append: [ bogus: ?total ]

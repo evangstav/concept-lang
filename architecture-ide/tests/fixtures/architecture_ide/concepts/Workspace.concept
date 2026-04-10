@@ -1,0 +1,35 @@
+concept Workspace [Concept, Sync]
+
+  purpose
+    hold a collection of concepts and syncs that together describe a system
+
+  state
+    concepts: set Concept
+    syncs: set Sync
+
+  actions
+    add_concept [ concept: Concept ] => [ workspace: Workspace ]
+      place the concept in the workspace so it can be referenced by syncs
+      effects:
+        concepts += concept
+
+    remove_concept [ concept: Concept ] => [ workspace: Workspace ]
+      remove the concept if no sync depends on it
+      effects:
+        concepts -= concept
+
+    add_sync [ sync: Sync ] => [ workspace: Workspace ]
+      register a sync that ties concepts together
+      effects:
+        syncs += sync
+
+    remove_sync [ sync: Sync ] => [ workspace: Workspace ]
+      unregister a sync
+      effects:
+        syncs -= sync
+
+  operational principle
+    after add_concept [ concept: c ] => [ workspace: w ]
+    and add_sync [ sync: s ] => [ workspace: w ]
+    then remove_sync [ sync: s ] => [ workspace: w ]
+    and remove_concept [ concept: c ] => [ workspace: w ]

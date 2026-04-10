@@ -1,0 +1,6 @@
+sync WorkspaceTracksConcept
+
+  when
+    Concept/introduce: [ name: ?name ] => [ name: ?name ]
+  then
+    Workspace/add_concept: [ concept: ?name ]

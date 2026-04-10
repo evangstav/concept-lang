@@ -1,29 +1,51 @@
-"""Shared I/O helpers for concept file operations."""
+"""Shared helpers for the MCP tool layer (v2 — workspace-root aware)."""
 
-import os
-from ..models import ConceptAST
-from ..parser import ParseError, parse_file
+from __future__ import annotations
 
+from pathlib import Path
 
-def list_concept_names(concepts_dir: str) -> list[str]:
-    """Return sorted list of concept names (without .concept extension)."""
-    try:
-        return sorted(
-            f[:-8] for f in os.listdir(concepts_dir) if f.endswith(".concept")
-        )
-    except FileNotFoundError:
-        return []
+from concept_lang.ast import Workspace
+from concept_lang.loader import load_workspace
+from concept_lang.validate.diagnostic import Diagnostic
 
 
-def load_all_concepts(concepts_dir: str) -> list[ConceptAST]:
-    """Load and parse all valid .concept files in concepts_dir."""
-    concepts = []
-    if not os.path.exists(concepts_dir):
-        return concepts
-    for name in list_concept_names(concepts_dir):
-        path = os.path.join(concepts_dir, f"{name}.concept")
-        try:
-            concepts.append(parse_file(path))
-        except (ParseError, OSError):
-            pass
-    return concepts
+def resolve_workspace_root(raw: str) -> Path:
+    """
+    Turn a raw string (from an env var or MCP server arg) into a
+    canonical workspace root path.
+
+    Heuristic:
+    * If ``raw`` points at a directory whose basename is ``concepts`` or
+      ``syncs``, treat its **parent** as the workspace root. This keeps
+      existing installations that set ``CONCEPTS_DIR=./concepts`` working
+      without changes.
+    * Otherwise treat ``raw`` itself as the workspace root.
+    """
+    p = Path(raw).expanduser()
+    if p.name in ("concepts", "syncs"):
+        return p.parent
+    return p
+
+
+def load_workspace_from_root(
+    workspace_root: str,
+) -> tuple[Workspace, list[Diagnostic]]:
+    """
+    Call ``concept_lang.loader.load_workspace`` with a resolved root.
+
+    Returns a ``(Workspace, diagnostics)`` tuple identical to the loader's.
+    This helper exists so that every MCP tool uses the same resolution
+    heuristic without repeating the Path massaging.
+    """
+    root = resolve_workspace_root(workspace_root)
+    return load_workspace(root)
+
+
+def concepts_dir_for(workspace_root: str) -> Path:
+    """Return the canonical ``<root>/concepts`` directory."""
+    return resolve_workspace_root(workspace_root) / "concepts"
+
+
+def syncs_dir_for(workspace_root: str) -> Path:
+    """Return the canonical ``<root>/syncs`` directory."""
+    return resolve_workspace_root(workspace_root) / "syncs"

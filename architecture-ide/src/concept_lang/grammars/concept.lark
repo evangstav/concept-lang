@@ -1,0 +1,81 @@
+// concept-lang 0.2.0 — concept grammar (full P1: header, purpose, state,
+// actions with bodies and effects, operational principle)
+// See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.1.
+//
+// INVARIANT: section keywords ("purpose", "state", "actions", "operational",
+// "effects") MUST remain bare string literals in the rules below — never
+// promote them to named terminals. PURPOSE_LINE and BODY_LINE are greedy
+// regexes that would otherwise swallow them. Lark's contextual lexer only
+// picks a keyword over these greedy terminals when the parser expects a new
+// section. Changing this breaks every section boundary in the grammar.
+
+start: concept_def
+
+concept_def: "concept" NAME type_params? purpose_section state_section? actions_section? op_section?
+
+type_params: "[" NAME ("," NAME)* "]"
+
+purpose_section: "purpose" purpose_body
+purpose_body: PURPOSE_LINE+
+
+state_section: "state" state_decl+
+state_decl: NAME ":" TYPE_EXPR
+
+actions_section: "actions" action_case+
+
+action_case: NAME "[" typed_name_list? "]" "=>" "[" typed_name_list? "]" case_body?
+case_body: BODY_LINE* effects_clause?
+
+effects_clause: "effects" ":" effect_line+
+effect_line: FIELD_REF EFFECT_OP EFFECT_RHS
+FIELD_REF: /[A-Za-z_][A-Za-z0-9_]*(\[[A-Za-z_][A-Za-z0-9_]*\])?/
+EFFECT_OP: ":=" | "+=" | "-="
+EFFECT_RHS: /[^\n]+/
+
+typed_name_list: typed_name (";" typed_name)*
+typed_name: NAME ":" TYPE_REF
+
+op_section: "operational" "principle" op_step+
+op_step: OP_KEYWORD NAME "[" op_arg_list? "]" "=>" "[" op_arg_list? "]"
+OP_KEYWORD: "after" | "then" | "and"
+op_arg_list: op_arg (";" op_arg)*
+op_arg: NAME ":" OP_VALUE
+// OP_VALUE is either a quoted literal, a bare identifier (unification witness),
+// or a numeric/boolean literal. Keep it as a single token the transformer passes
+// through verbatim.
+OP_VALUE: /"[^"]*"|[A-Za-z0-9_]+/
+
+TYPE_EXPR: /[^\n]+/
+TYPE_REF:  /[A-Za-z_][A-Za-z0-9_ \->]*/
+
+// BODY_LINE matches an indented non-empty line that is NOT a reserved section
+// keyword or the start of an action header. The negative lookaheads prevent
+// it from swallowing the next section boundary.
+//
+// The `(?![ \t])` immediately after `[ \t]+` is critical: without it, Python's
+// regex engine backtracks the greedy whitespace match to land on a position
+// where the negative lookahead succeeds vacuously (e.g. matching just 1 space
+// of indentation, leaving the next char as a space, which doesn't match any
+// of the reserved alternations). Anchoring the leading whitespace to consume
+// ALL leading whitespace forces the lookahead to evaluate against the first
+// non-whitespace character.
+//
+// The `[ \t]*\n` anchors after each section keyword are also critical: a
+// keyword ONLY starts a new section when it stands alone on its line
+// (optional trailing whitespace then newline). Without the newline anchor,
+// natural English prose like "state the concept's purpose" or "actions
+// below should also be valid prose" would be misread as section boundaries
+// and the parser would silently fall through, letting PURPOSE_LINE swallow
+// everything. `operational` needs its dedicated pattern because the actual
+// section opener is `operational principle`, and `effects:` needs the
+// trailing colon because it has one in the source.
+BODY_LINE: /[ \t]+(?![ \t])(?!(?:purpose|state|actions)[ \t]*\n|operational[ \t]+principle[ \t]*\n|effects:[ \t]*\n|[A-Za-z_][A-Za-z0-9_]*[ \t]*\[)[^\n]+/
+
+PURPOSE_LINE: /[ \t]+[^\n]+/
+
+NAME: /[A-Za-z_][A-Za-z0-9_]*/
+
+%import common.NEWLINE
+%import common.WS_INLINE
+%ignore NEWLINE
+%ignore WS_INLINE

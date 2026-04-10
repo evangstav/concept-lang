@@ -1,0 +1,10 @@
+concept Password [U]
+
+  purpose
+    store credentials
+
+  actions
+    set [ user: U ; password: string ] => [ error: string ]
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ error: "nope" ]

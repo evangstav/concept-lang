@@ -1,0 +1,16 @@
+sync FormatArticle
+
+  when
+    Web/format: [ type: "article" ; article: ?article ; request: ?request ] => [ ]
+  where
+    Article: {
+      ?article title: ?title ;
+               description: ?description ;
+               body: ?body ;
+               author: ?author
+    }
+    User: { ?author name: ?authorName }
+    optional Tag: { ?article tag: ?tag }
+    optional Favorite: { ?article count: ?count }
+  then
+    Web/respond: [ request: ?request ; body: ?title ; code: 200 ]

@@ -1,0 +1,6 @@
+sync SpecifyDrawsDiagram
+
+  when
+    Concept/specify: [ name: ?name ] => [ name: ?name ]
+  then
+    Diagram/render: [ subject: ?name ; format: "svg" ]

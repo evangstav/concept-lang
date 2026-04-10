@@ -1,0 +1,6 @@
+sync LogInc
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  then
+    Logger/write: [ msg: ?total ] => [ ]

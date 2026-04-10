@@ -1,0 +1,14 @@
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+
+  actions
+    inc [ n: int ] => [ total: int ]
+      add n to total
+
+  operational principle
+    after inc [ n: 1 ] => [ total: 1 ]
