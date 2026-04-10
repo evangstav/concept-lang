@@ -204,3 +204,51 @@ concept Password [U]
         assert case.effects[0].op == ":="
         assert case.effects[0].rhs == "hash"
         assert case.effects[1].field == "salt"
+
+
+class TestConceptOperationalPrinciple:
+    def test_two_step_principle(self):
+        src = """
+concept Password [U]
+
+  purpose
+    credentials
+
+  state
+    password: U -> string
+
+  actions
+    set [ user: U ; password: string ] => [ user: U ]
+    check [ user: U ; password: string ] => [ valid: boolean ]
+
+  operational principle
+    after set [ user: x ; password: "secret" ] => [ user: x ]
+    then check [ user: x ; password: "secret" ] => [ valid: true ]
+"""
+        ast = parse_concept_source(src)
+        op = ast.operational_principle
+        assert len(op.steps) == 2
+        assert op.steps[0].keyword == "after"
+        assert op.steps[0].action_name == "set"
+        assert op.steps[0].inputs == [("user", "x"), ("password", '"secret"')]
+        assert op.steps[0].outputs == [("user", "x")]
+        assert op.steps[1].keyword == "then"
+        assert op.steps[1].action_name == "check"
+
+    def test_and_step(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  actions
+    inc [ ] => [ n: int ]
+    read [ ] => [ n: int ]
+
+  operational principle
+    after inc [ ] => [ n: 1 ]
+    and read [ ] => [ n: 1 ]
+"""
+        ast = parse_concept_source(src)
+        assert ast.operational_principle.steps[1].keyword == "and"

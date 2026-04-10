@@ -7,6 +7,7 @@ from concept_lang.ast import (
     ActionCase,
     ConceptAST,
     EffectClause,
+    OPStep,
     OperationalPrinciple,
     StateDecl,
     TypedName,
@@ -46,6 +47,12 @@ class ConceptTransformer(Transformer):
         return str(token).strip()
 
     def EFFECT_RHS(self, token: Token) -> str:
+        return str(token).strip()
+
+    def OP_KEYWORD(self, token: Token) -> str:
+        return str(token)
+
+    def OP_VALUE(self, token: Token) -> str:
         return str(token).strip()
 
     # --- sections ------------------------------------------------------------
@@ -132,6 +139,40 @@ class ConceptTransformer(Transformer):
             grouped[name].append(case)
         return [Action(name=n, cases=grouped[n]) for n in order]
 
+    # --- operational principle ----------------------------------------------
+
+    def op_arg(self, name: str, value: str) -> tuple[str, str]:
+        # NOTE: Deliberately a tuple, not a PatternField. OP step args use bare
+        # identifiers as unification witnesses (e.g., `user: x`), while sync
+        # PatternFields use `?var` prefixing. The two shapes are intentionally
+        # separate — consolidating them would conflate different semantics.
+        return (name, value)
+
+    def op_arg_list(self, *args: tuple[str, str]) -> list[tuple[str, str]]:
+        return list(args)
+
+    def op_step(self, keyword: str, action_name: str, *rest) -> OPStep:
+        inputs: list[tuple[str, str]] = []
+        outputs: list[tuple[str, str]] = []
+        list_args = [r for r in rest if isinstance(r, list)]
+        if len(list_args) == 2:
+            inputs, outputs = list_args
+        elif len(list_args) == 1:
+            idx_first = next(i for i, r in enumerate(rest) if isinstance(r, list))
+            if idx_first == 0:
+                inputs = list_args[0]
+            else:
+                outputs = list_args[0]
+        return OPStep(
+            keyword=keyword,  # type: ignore[arg-type]
+            action_name=action_name,
+            inputs=inputs,
+            outputs=outputs,
+        )
+
+    def op_section(self, *steps: OPStep) -> OperationalPrinciple:
+        return OperationalPrinciple(steps=list(steps))
+
     # --- top level -----------------------------------------------------------
 
     def concept_def(self, name: str, *rest) -> ConceptAST:
@@ -139,8 +180,11 @@ class ConceptTransformer(Transformer):
         purpose: str = ""
         state: list[StateDecl] = []
         actions: list[Action] = []
+        op_principle = OperationalPrinciple(steps=[])
         for item in rest:
-            if isinstance(item, list) and item:
+            if isinstance(item, OperationalPrinciple):
+                op_principle = item
+            elif isinstance(item, list) and item:
                 head = item[0]
                 if isinstance(head, str):
                     params = item
@@ -156,7 +200,7 @@ class ConceptTransformer(Transformer):
             purpose=purpose,
             state=state,
             actions=actions,
-            operational_principle=OperationalPrinciple(steps=[]),
+            operational_principle=op_principle,
             source="",
         )
 

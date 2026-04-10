@@ -1,4 +1,5 @@
-// concept-lang 0.2.0 — concept grammar (through action bodies with effects:)
+// concept-lang 0.2.0 — concept grammar (full P1: header, purpose, state,
+// actions with bodies and effects, operational principle)
 // See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.1.
 //
 // INVARIANT: section keywords ("purpose", "state", "actions", "operational",
@@ -10,7 +11,7 @@
 
 start: concept_def
 
-concept_def: "concept" NAME type_params? purpose_section state_section? actions_section?
+concept_def: "concept" NAME type_params? purpose_section state_section? actions_section? op_section?
 
 type_params: "[" NAME ("," NAME)* "]"
 
@@ -33,6 +34,16 @@ EFFECT_RHS: /[^\n]+/
 
 typed_name_list: typed_name (";" typed_name)*
 typed_name: NAME ":" TYPE_REF
+
+op_section: "operational" "principle" op_step+
+op_step: OP_KEYWORD NAME "[" op_arg_list? "]" "=>" "[" op_arg_list? "]"
+OP_KEYWORD: "after" | "then" | "and"
+op_arg_list: op_arg (";" op_arg)*
+op_arg: NAME ":" OP_VALUE
+// OP_VALUE is either a quoted literal, a bare identifier (unification witness),
+// or a numeric/boolean literal. Keep it as a single token the transformer passes
+// through verbatim.
+OP_VALUE: /"[^"]*"|[A-Za-z0-9_]+/
 
 TYPE_EXPR: /[^\n]+/
 TYPE_REF:  /[A-Za-z_][A-Za-z0-9_ \->]*/
