@@ -350,3 +350,63 @@ sync Bad
         assert len(diags) == 1
         assert diags[0].code == "S3"
         assert "?mystery" in diags[0].message
+
+
+from concept_lang.validate import rule_s4_where_vars_bound
+
+
+class TestRuleS4:
+    def _index(self) -> WorkspaceIndex:
+        return WorkspaceIndex.build(_workspace_with_counter_and_log())
+
+    def test_subject_bound_in_when_is_allowed(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync Ok
+
+  when
+    Counter/inc: [ ] => [ total: ?total ]
+  where
+    Counter: { ?total amount: ?amount }
+  then
+    Log/append: [ event: ?amount ]
+"""
+        )
+        assert rule_s4_where_vars_bound(sync, idx) == []
+
+    def test_subject_unbound_is_flagged(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync Bad
+
+  when
+    Counter/inc: [ ] => [ ]
+  where
+    Counter: { ?mystery amount: ?amount }
+  then
+    Log/append: [ event: ?amount ]
+"""
+        )
+        diags = rule_s4_where_vars_bound(sync, idx)
+        assert len(diags) == 1
+        assert diags[0].code == "S4"
+        assert "?mystery" in diags[0].message
+
+    def test_subject_bound_by_earlier_bind_is_allowed(self):
+        idx = self._index()
+        sync = parse_sync_source(
+            """
+sync Ok
+
+  when
+    Counter/inc: [ ] => [ ]
+  where
+    bind (uuid() as ?entry)
+    Counter: { ?entry amount: ?amount }
+  then
+    Log/append: [ event: ?amount ]
+"""
+        )
+        assert rule_s4_where_vars_bound(sync, idx) == []

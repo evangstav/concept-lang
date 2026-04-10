@@ -186,3 +186,54 @@ def rule_s3_then_vars_bound(
                 )
             )
     return diagnostics
+
+
+def rule_s4_where_vars_bound(
+    sync: SyncAST,
+    index: WorkspaceIndex,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    S4: Every `?var` used as the **subject** of a `where` state query
+    triple must be bound by:
+      - a `when` pattern,
+      - an earlier `bind` in the same `where`,
+      - or an earlier query in the same `where`.
+
+    Object variables are not checked here - the paper treats them as
+    introduced by the query itself (SPARQL pattern matching).
+    """
+    _ = index
+    if sync.where is None:
+        return []
+    diagnostics: list[Diagnostic] = []
+    bound: set[str] = _bindings_from_when(sync)
+    for bind in sync.where.binds:
+        bound.add(bind.variable)
+    # Walk queries in source order, accumulating bindings as we go.
+    for query in sync.where.queries:
+        for triple in query.triples:
+            if triple.subject.startswith("?") and triple.subject not in bound:
+                diagnostics.append(
+                    Diagnostic(
+                        severity="error",
+                        file=file,
+                        line=None,
+                        column=None,
+                        code="S4",
+                        message=(
+                            f"sync '{sync.name}' where clause state query on "
+                            f"concept '{query.concept}' uses unbound subject "
+                            f"'{triple.subject}' (bind it in `when` or in an "
+                            f"earlier `where` item)"
+                        ),
+                    )
+                )
+            # After inspecting this triple, both its subject and object are
+            # considered bound for subsequent triples.
+            if triple.subject.startswith("?"):
+                bound.add(triple.subject)
+            if triple.object.startswith("?"):
+                bound.add(triple.object)
+    return diagnostics
