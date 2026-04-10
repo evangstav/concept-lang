@@ -1,5 +1,14 @@
 // concept-lang 0.2.0 — concept grammar (first slice: header + purpose)
 // See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.1.
+//
+// INVARIANT: section keywords ("purpose", "state", "actions", "operational",
+// "effects") MUST remain bare string literals in the rules below — never
+// promote them to named terminals (e.g. `STATE_KW: "state"`). PURPOSE_LINE
+// and (in later tasks) BODY_LINE are greedy regexes that would otherwise
+// swallow them. Lark's contextual lexer only picks a keyword over these
+// greedy terminals when the parser expects a new section, and it can only
+// do so if the keyword is an anonymous token introduced by a literal in
+// a rule. Changing this breaks every section boundary in the grammar.
 
 start: concept_def
 
