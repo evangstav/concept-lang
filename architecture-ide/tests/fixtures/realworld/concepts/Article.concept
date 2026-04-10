@@ -1,0 +1,41 @@
+concept Article [A, U]
+
+  purpose
+    to publish authored content that other users can read
+
+  state
+    articles: set A
+    title: A -> string
+    description: A -> string
+    body: A -> string
+    slug: A -> string
+    author: A -> U
+    createdAt: A -> string
+    updatedAt: A -> string
+
+  actions
+    create [ article: A ; title: string ; description: string ; body: string ; author: U ] => [ article: A ]
+      publish a new article with the given title description body and author
+      assign a slug derived from the title
+      record the creation timestamp
+      effects:
+        articles += article
+        title[article] := title
+        description[article] := description
+        body[article] := body
+        author[article] := author
+
+    update [ article: A ; body: string ] => [ article: A ]
+      replace the article body and update the modified timestamp
+      effects:
+        body[article] := body
+
+    delete [ article: A ] => [ article: A ]
+      remove the article from the published set
+      effects:
+        articles -= article
+
+  operational principle
+    after create [ article: a ; title: "Hello" ; description: "intro" ; body: "text" ; author: u ] => [ article: a ]
+    then update [ article: a ; body: "new" ] => [ article: a ]
+    and delete [ article: a ] => [ article: a ]

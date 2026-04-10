@@ -1,0 +1,23 @@
+concept Web
+
+  purpose
+    translate external HTTP traffic into concept actions and back
+
+  state
+    requests: set string
+
+  actions
+    request [ method: string ; path: string ] => [ request: string ]
+      record an incoming HTTP request
+      effects:
+        requests += request
+
+    respond [ request: string ; body: string ; code: int ] => [ request: string ]
+      send the final response for a request
+
+    format [ type: string ; request: string ] => [ request: string ]
+      format a response body for a particular content type
+
+  operational principle
+    after request [ method: "GET" ; path: "articles" ] => [ request: r ]
+    then respond [ request: r ; body: "body" ; code: 200 ] => [ request: r ]
