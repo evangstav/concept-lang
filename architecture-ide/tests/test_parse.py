@@ -404,3 +404,33 @@ class TestRealworldFixtures:
             assert sync.name, f"{f.name}: empty name"
             assert sync.when, f"{f.name}: empty when"
             assert sync.then, f"{f.name}: empty then"
+
+
+class TestP1Gate:
+    """
+    The P1 gate from the paper-alignment spec: every positive fixture
+    must parse cleanly into a ConceptAST or SyncAST without exceptions,
+    and every ConceptAST must have a non-empty purpose and operational
+    principle, and every SyncAST must have a non-empty when and then.
+    """
+    FIXTURES_ROOT = Path(__file__).parent / "fixtures"
+
+    def test_all_positive_fixtures_parse(self):
+        concept_files = sorted(self.FIXTURES_ROOT.rglob("*.concept"))
+        sync_files = sorted(self.FIXTURES_ROOT.rglob("*.sync"))
+
+        # Expected totals: 4 (architecture_ide) + 6 (realworld) concepts; 3 + 6 syncs.
+        assert len(concept_files) == 10, f"Found {len(concept_files)} concept files"
+        assert len(sync_files) == 9, f"Found {len(sync_files)} sync files"
+
+        for f in concept_files:
+            ast = parse_concept_file(f)
+            assert ast.name, f"{f}: empty name"
+            assert ast.purpose, f"{f}: empty purpose"
+            assert ast.operational_principle.steps, f"{f}: empty operational principle"
+
+        for f in sync_files:
+            sync = parse_sync_file(f)
+            assert sync.name, f"{f}: empty name"
+            assert sync.when, f"{f}: empty when"
+            assert sync.then, f"{f}: empty then"
