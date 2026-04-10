@@ -248,3 +248,60 @@ class TestExplorerTools:
         html = mcp.tools["get_explorer_html"]()
         assert "<html" in html
         assert "Counter" in html
+
+
+# ---------------------------------------------------------------------------
+# P4 gate — end-to-end pipeline against positive fixtures
+# ---------------------------------------------------------------------------
+
+
+class TestP4Gate:
+    """
+    End-to-end: every P4 MCP tool runs against a positive fixture workspace
+    and produces a well-formed response.
+    """
+
+    REALWORLD = Path(__file__).parent / "fixtures" / "realworld"
+    ARCHITECTURE_IDE = Path(__file__).parent / "fixtures" / "architecture_ide"
+
+    @pytest.mark.parametrize("root", [REALWORLD, ARCHITECTURE_IDE])
+    def test_whole_pipeline_on_positive_fixture(self, root: Path):
+        mcp = _make_mcp(root)
+
+        # list
+        concepts = _call(mcp, "list_concepts")
+        syncs = _call(mcp, "list_syncs")
+        assert isinstance(concepts, list)
+        assert isinstance(syncs, list)
+        assert len(concepts) > 0
+
+        # read one concept and one sync (if present)
+        first_concept = concepts[0]
+        read = _call(mcp, "read_concept", name=first_concept)
+        assert "source" in read
+        assert read["ast"]["name"]
+
+        if syncs:
+            first_sync = syncs[0]
+            read_s = _call(mcp, "read_sync", name=first_sync)
+            assert "source" in read_s
+
+        # validate whole workspace
+        vw = _call(mcp, "validate_workspace")
+        errors = [d for d in vw["diagnostics"] if d["severity"] == "error"]
+        assert errors == [], (
+            f"positive fixture {root.name} should validate cleanly, got: "
+            + json.dumps(errors, indent=2)
+        )
+
+        # workspace graph
+        g = mcp.tools["get_workspace_graph"]()
+        assert g.startswith("graph TD")
+        for name in concepts:
+            assert name in g
+
+        # explorer HTML
+        html = mcp.tools["get_explorer_html"]()
+        assert "<html" in html
+        for name in concepts:
+            assert name in html
