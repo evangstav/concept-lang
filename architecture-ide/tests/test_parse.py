@@ -1,6 +1,10 @@
 """Tests for the new Lark-based parser (concept_lang.parse)."""
 
+from pathlib import Path
+
+from concept_lang.parse import parse_concept_file
 from concept_lang.parse import parse_concept_source
+from concept_lang.parse import parse_sync_file
 from concept_lang.parse import parse_sync_source
 
 
@@ -353,3 +357,27 @@ sync FormatWithTags
 """
         sync = parse_sync_source(src)
         assert sync.where.queries[0].is_optional is True
+
+
+class TestArchitectureIdeFixtures:
+    FIXTURES_ROOT = Path(__file__).parent / "fixtures" / "architecture_ide"
+
+    def test_all_concepts_parse(self):
+        concepts_dir = self.FIXTURES_ROOT / "concepts"
+        files = sorted(concepts_dir.glob("*.concept"))
+        assert len(files) == 4, f"Expected 4 concept fixtures, found {len(files)}"
+        for f in files:
+            ast = parse_concept_file(f)
+            assert ast.name, f"{f.name}: empty name"
+            assert ast.purpose, f"{f.name}: empty purpose"
+            assert ast.operational_principle.steps, f"{f.name}: empty op principle"
+
+    def test_all_syncs_parse(self):
+        syncs_dir = self.FIXTURES_ROOT / "syncs"
+        files = sorted(syncs_dir.glob("*.sync"))
+        assert len(files) == 3, f"Expected 3 sync fixtures, found {len(files)}"
+        for f in files:
+            sync = parse_sync_file(f)
+            assert sync.name, f"{f.name}: empty name"
+            assert sync.when, f"{f.name}: empty when"
+            assert sync.then, f"{f.name}: empty then"
