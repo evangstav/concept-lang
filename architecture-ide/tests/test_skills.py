@@ -61,8 +61,8 @@ SKILLS_DIR = REPO_ROOT / "skills"
 FORBIDDEN_PHRASES: list[tuple[str, str]] = [
     (
         r"\bget_dependency_graph\b",
-        "Deprecated alias — rewritten skills must call get_workspace_graph. "
-        "The alias is scheduled for P7 removal.",
+        "Removed in 0.3.0 — rewritten skills must call get_workspace_graph. "
+        "The alias was deleted in P7.",
     ),
     (
         r"\bcodegen_tools\b",
@@ -96,11 +96,10 @@ FORBIDDEN_PHRASES: list[tuple[str, str]] = [
 # removed.
 # ---------------------------------------------------------------------------
 KNOWN_IGNORE_TOOLS: dict[str, set[str]] = {
-    # All current v1 skills only reference tools that resolve via the P4
-    # registry (get_dependency_graph is still present as a back-compat
-    # alias), so this dict is empty in the scaffold. Future tasks may add
-    # entries here if a rewrite introduces a tool name before the server
-    # registers it.
+    # All current v2 skills only reference tools that resolve via the P4
+    # registry. The get_dependency_graph back-compat alias was removed in
+    # 0.3.0 (P7) so no skill may reference it — any match is a regression
+    # and the FORBIDDEN_PHRASES entry above catches it.
 }
 
 

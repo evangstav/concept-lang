@@ -80,7 +80,7 @@ def register_workspace_tools(mcp: FastMCP, workspace_root: str) -> None:
             "Nodes are concepts; edges are syncs labeled with their "
             "declared name. Pass to "
             "mcp__claude_ai_Mermaid_Chart__validate_and_render_mermaid_diagram "
-            "to render. Replaces the old `get_dependency_graph`."
+            "to render."
         )
     )
     def get_workspace_graph() -> str:
@@ -88,12 +88,3 @@ def register_workspace_tools(mcp: FastMCP, workspace_root: str) -> None:
         if not ws.concepts and not ws.syncs:
             return "// No concepts or syncs found"
         return _workspace_graph_mermaid(ws)
-
-    @mcp.tool(
-        description=(
-            "Deprecated: use get_workspace_graph. Returns the same Mermaid "
-            "string. Removed in P7."
-        )
-    )
-    def get_dependency_graph() -> str:
-        return get_workspace_graph()

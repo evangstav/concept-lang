@@ -97,8 +97,7 @@ Work iteratively: propose name+purpose first, then state, then action list, then
 4. End with a blocking-issues / warnings / positive-observations
    summary.
 
-Do not call `get_dependency_graph` (deprecated alias for
-`get_workspace_graph`). Do not touch any app-spec tool.""",
+Do not touch any app-spec tool.""",
                 },
             }
         ]
