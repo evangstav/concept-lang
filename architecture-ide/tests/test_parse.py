@@ -1,6 +1,7 @@
 """Tests for the new Lark-based parser (concept_lang.parse)."""
 
 from concept_lang.parse import parse_concept_source
+from concept_lang.parse import parse_sync_source
 
 
 class TestConceptHeader:
@@ -63,3 +64,43 @@ concept Journal
         assert "actions the user performed" in ast.purpose
         assert "effects" in ast.purpose
         assert "operational decision" in ast.purpose
+
+
+
+class TestSyncBasic:
+    def test_simple_when_then(self):
+        src = """
+sync LogEveryRequest
+
+  when
+    Web/request: [ ] => [ request: ?request ]
+  then
+    Log/append: [ event: ?request ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.name == "LogEveryRequest"
+        assert len(sync.when) == 1
+        assert sync.when[0].concept == "Web"
+        assert sync.when[0].action == "request"
+        assert sync.when[0].input_pattern == []
+        assert len(sync.when[0].output_pattern) == 1
+        assert sync.when[0].output_pattern[0].name == "request"
+        assert sync.when[0].output_pattern[0].kind == "var"
+        assert sync.when[0].output_pattern[0].value == "?request"
+        assert len(sync.then) == 1
+        assert sync.then[0].concept == "Log"
+        assert sync.then[0].action == "append"
+
+    def test_literal_in_when(self):
+        src = """
+sync OnRegister
+
+  when
+    Web/request: [ method: "register" ] => [ ]
+  then
+    Audit/log: [ kind: "register" ]
+"""
+        sync = parse_sync_source(src)
+        assert sync.when[0].input_pattern[0].kind == "literal"
+        assert sync.when[0].input_pattern[0].value == '"register"'
+        assert sync.then[0].input_pattern[0].value == '"register"'

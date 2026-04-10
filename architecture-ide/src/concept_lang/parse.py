@@ -40,3 +40,37 @@ def parse_concept_file(path: str | Path) -> ConceptAST:
     """Parse a `.concept` file from disk."""
     text = Path(path).read_text(encoding="utf-8")
     return parse_concept_source(text)
+
+
+
+# --- sync parser ------------------------------------------------------------
+
+from concept_lang.ast import SyncAST  # noqa: E402
+from concept_lang.transformers.sync_transformer import SyncTransformer  # noqa: E402
+
+
+_sync_parser: Lark | None = None
+
+
+def _get_sync_parser() -> Lark:
+    global _sync_parser
+    if _sync_parser is None:
+        _sync_parser = Lark(
+            read_grammar("sync.lark"),
+            parser="earley",
+            maybe_placeholders=False,
+        )
+    return _sync_parser
+
+
+def parse_sync_source(source: str) -> SyncAST:
+    """Parse sync source text into a SyncAST."""
+    tree = _get_sync_parser().parse(source)
+    ast = SyncTransformer().transform(tree)
+    return ast.model_copy(update={"source": source})
+
+
+def parse_sync_file(path: str | Path) -> SyncAST:
+    """Parse a `.sync` file from disk."""
+    text = Path(path).read_text(encoding="utf-8")
+    return parse_sync_source(text)

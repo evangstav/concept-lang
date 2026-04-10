@@ -1,0 +1,26 @@
+// concept-lang 0.2.0 — sync grammar (first slice: when + then)
+// See docs/superpowers/specs/2026-04-10-paper-alignment-design.md §3.2.
+
+start: sync_def
+
+sync_def: "sync" NAME when_clause then_clause
+
+when_clause: "when" action_pattern+
+then_clause: "then" action_pattern+
+
+action_pattern: NAME "/" NAME ":" pattern_list ("=>" pattern_list)?
+
+pattern_list: "[" (pattern_field (";" pattern_field)*)? "]"
+
+pattern_field: NAME ":" pattern_value
+pattern_value: VAR | LITERAL
+
+VAR: /\?[A-Za-z_][A-Za-z0-9_]*/
+LITERAL: /"[^"]*"|[0-9]+|true|false/
+
+NAME: /[A-Za-z_][A-Za-z0-9_]*/
+
+%import common.NEWLINE
+%import common.WS_INLINE
+%ignore NEWLINE
+%ignore WS_INLINE
