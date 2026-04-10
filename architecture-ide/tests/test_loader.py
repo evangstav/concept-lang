@@ -291,3 +291,42 @@ class TestLoaderReexport:
         from concept_lang import load_workspace as top_level
         from concept_lang.loader import load_workspace as module_level
         assert top_level is module_level
+
+
+class TestP3Gate:
+    """
+    The P3 gate: the full P1+P2+P3 pipeline must accept both positive
+    fixture workspaces, produce no parse errors, and carry real source
+    positions through every positioned AST node.
+    """
+
+    def test_positive_fixtures_round_trip_through_loader_with_positions(self):
+        for subdir in ("architecture_ide", "realworld"):
+            root = Path(__file__).parent / "fixtures" / subdir
+            ws, diags = load_workspace(root)
+            assert diags == [], (
+                f"{subdir}: parse diagnostics: "
+                + "; ".join(f"{d.code} {d.file}: {d.message}" for d in diags)
+            )
+            assert ws.concepts, f"{subdir}: no concepts loaded"
+            # Every loaded concept must carry real line numbers on the
+            # nodes the transformer sets (ConceptAST.line is the most
+            # reliable — it's always the first token of the file).
+            for name, concept in ws.concepts.items():
+                assert concept.line is not None, f"{subdir}/{name}: no ConceptAST.line"
+                assert concept.line >= 1
+                # State declarations, when present, also carry lines.
+                for decl in concept.state:
+                    assert decl.line is not None, (
+                        f"{subdir}/{name}: state '{decl.name}' has no line"
+                    )
+            for name, sync in ws.syncs.items():
+                assert sync.line is not None, f"{subdir}/{name}: no SyncAST.line"
+                for ap in sync.when:
+                    assert ap.line is not None, (
+                        f"{subdir}/{name}: when pattern has no line"
+                    )
+                for ap in sync.then:
+                    assert ap.line is not None, (
+                        f"{subdir}/{name}: then pattern has no line"
+                    )
