@@ -623,3 +623,54 @@ class TestConceptTransformerPositions:
         ast = self._parse()
         assert ast.line is not None, "top-level line was clobbered by model_copy"
         assert ast.state[0].line is not None, "nested line was clobbered by model_copy"
+
+
+class TestSyncTransformerPositions:
+    _SRC = (
+        "sync LogInc\n"                                      # line 1
+        "\n"                                                  # line 2
+        "  when\n"                                            # line 3
+        "    Counter/inc: [ n: ?n ] => [ total: ?t ]\n"      # line 4
+        "  where\n"                                           # line 5
+        "    bind ( ?n + 1 as ?m )\n"                         # line 6
+        "    Log: { ?log event: ?e }\n"                       # line 7
+        "  then\n"                                            # line 8
+        "    Log/append: [ event: ?m ]\n"                     # line 9
+    )
+
+    def _parse(self):
+        return parse_sync_source(self._SRC)
+
+    def test_sync_ast_line_is_1(self):
+        sync = self._parse()
+        assert sync.line == 1
+
+    def test_when_action_pattern_line_is_4(self):
+        sync = self._parse()
+        assert sync.when[0].line == 4
+
+    def test_where_bind_line_is_6(self):
+        sync = self._parse()
+        assert sync.where is not None
+        assert sync.where.binds[0].line == 6
+
+    def test_where_state_query_line_is_7(self):
+        sync = self._parse()
+        assert sync.where is not None
+        assert sync.where.queries[0].line == 7
+
+    def test_where_clause_line_is_5(self):
+        sync = self._parse()
+        assert sync.where is not None
+        assert sync.where.line == 5
+
+    def test_then_action_pattern_line_is_9(self):
+        sync = self._parse()
+        assert sync.then[0].line == 9
+
+    def test_model_copy_preserves_positions(self):
+        # Same concern as concept side: verify model_copy(update={"source": ...})
+        # doesn't drop line/column.
+        sync = self._parse()
+        assert sync.line is not None, "top-level line was clobbered by model_copy"
+        assert sync.when[0].line is not None, "nested line was clobbered by model_copy"

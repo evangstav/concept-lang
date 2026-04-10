@@ -1,6 +1,7 @@
 """Transform a Lark parse tree for a .sync file into a SyncAST."""
 
 from lark import Token, Transformer, v_args
+from lark.tree import Meta
 
 from concept_lang.ast import (
     ActionPattern,
@@ -11,6 +12,13 @@ from concept_lang.ast import (
     Triple,
     WhereClause,
 )
+
+
+def _pos(meta: Meta) -> tuple[int | None, int | None]:
+    """Extract (line, column) from a Lark Meta, tolerating empty metas."""
+    if meta is None or meta.empty:
+        return (None, None)
+    return (meta.line, meta.column)
 
 
 @v_args(inline=True)
@@ -44,18 +52,23 @@ class SyncTransformer(Transformer):
     def pattern_list(self, *fields: PatternField) -> list[PatternField]:
         return list(fields)
 
+    @v_args(meta=True, inline=True)
     def action_pattern(
         self,
+        meta: Meta,
         concept: str,
         action: str,
         input_pattern: list[PatternField],
         output_pattern: list[PatternField] | None = None,
     ) -> ActionPattern:
+        line, col = _pos(meta)
         return ActionPattern(
             concept=concept,
             action=action,
             input_pattern=input_pattern,
             output_pattern=output_pattern if output_pattern is not None else [],
+            line=line,
+            column=col,
         )
 
     # --- where pieces --------------------------------------------------------
@@ -77,19 +90,43 @@ class SyncTransformer(Transformer):
             )
         return triples
 
-    def state_query(self, concept: str, triples: list[Triple]) -> StateQuery:
-        return StateQuery(concept=concept, triples=triples, is_optional=False)
+    @v_args(meta=True, inline=True)
+    def state_query(
+        self, meta: Meta, concept: str, triples: list[Triple]
+    ) -> StateQuery:
+        line, col = _pos(meta)
+        return StateQuery(
+            concept=concept, triples=triples, is_optional=False,
+            line=line, column=col,
+        )
 
-    def optional_query(self, concept: str, triples: list[Triple]) -> StateQuery:
-        return StateQuery(concept=concept, triples=triples, is_optional=True)
+    @v_args(meta=True, inline=True)
+    def optional_query(
+        self, meta: Meta, concept: str, triples: list[Triple]
+    ) -> StateQuery:
+        line, col = _pos(meta)
+        return StateQuery(
+            concept=concept, triples=triples, is_optional=True,
+            line=line, column=col,
+        )
 
-    def bind_clause(self, expression: str, variable: str) -> BindClause:
-        return BindClause(expression=expression.strip(), variable=variable)
+    @v_args(meta=True, inline=True)
+    def bind_clause(
+        self, meta: Meta, expression: str, variable: str
+    ) -> BindClause:
+        line, col = _pos(meta)
+        return BindClause(
+            expression=expression.strip(),
+            variable=variable,
+            line=line,
+            column=col,
+        )
 
     def where_item(self, item):
         return item
 
-    def where_clause(self, *items) -> WhereClause:
+    @v_args(meta=True, inline=True)
+    def where_clause(self, meta: Meta, *items) -> WhereClause:
         queries: list[StateQuery] = []
         binds: list[BindClause] = []
         for item in items:
@@ -97,7 +134,10 @@ class SyncTransformer(Transformer):
                 queries.append(item)
             elif isinstance(item, BindClause):
                 binds.append(item)
-        return WhereClause(queries=queries, binds=binds)
+        line, col = _pos(meta)
+        return WhereClause(
+            queries=queries, binds=binds, line=line, column=col,
+        )
 
     # --- sections ------------------------------------------------------------
 
@@ -107,7 +147,8 @@ class SyncTransformer(Transformer):
     def then_clause(self, *patterns: ActionPattern) -> list[ActionPattern]:
         return list(patterns)
 
-    def sync_def(self, name: str, *rest) -> SyncAST:
+    @v_args(meta=True, inline=True)
+    def sync_def(self, meta: Meta, name: str, *rest) -> SyncAST:
         when: list[ActionPattern] = []
         then: list[ActionPattern] = []
         where: WhereClause | None = None
@@ -115,7 +156,16 @@ class SyncTransformer(Transformer):
             when, then = rest
         elif len(rest) == 3:
             when, where, then = rest
-        return SyncAST(name=name, when=when, where=where, then=then, source="")
+        line, col = _pos(meta)
+        return SyncAST(
+            name=name,
+            when=when,
+            where=where,
+            then=then,
+            source="",
+            line=line,
+            column=col,
+        )
 
     def start(self, sync: SyncAST) -> SyncAST:
         return sync
