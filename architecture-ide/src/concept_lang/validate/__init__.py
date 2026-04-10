@@ -42,6 +42,7 @@ from concept_lang.validate.sync_rules import (
     rule_s4_where_vars_bound,
     rule_s5_multiple_concepts,
 )
+from concept_lang.validate.workspace import validate_workspace
 
 __all__ = [
     "Diagnostic",
@@ -58,4 +59,5 @@ __all__ = [
     "rule_s3_then_vars_bound",
     "rule_s4_where_vars_bound",
     "rule_s5_multiple_concepts",
+    "validate_workspace",
 ]

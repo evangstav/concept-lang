@@ -7,6 +7,7 @@ from concept_lang.ast import (
     ActionCase,
     ConceptAST,
     OperationalPrinciple,
+    OPStep,
     StateDecl,
     TypedName,
     Workspace,
@@ -580,7 +581,16 @@ def _workspace_with_counter_and_log() -> Workspace:
                 ],
             )
         ],
-        operational_principle=OperationalPrinciple(steps=[]),
+        operational_principle=OperationalPrinciple(
+            steps=[
+                OPStep(
+                    keyword="after",
+                    action_name="inc",
+                    inputs=[("amount", "1")],
+                    outputs=[("total", "1")],
+                )
+            ]
+        ),
         source="",
     )
     log = ConceptAST(
@@ -599,7 +609,16 @@ def _workspace_with_counter_and_log() -> Workspace:
                 ],
             )
         ],
-        operational_principle=OperationalPrinciple(steps=[]),
+        operational_principle=OperationalPrinciple(
+            steps=[
+                OPStep(
+                    keyword="after",
+                    action_name="append",
+                    inputs=[("event", '"hi"')],
+                    outputs=[("entry", '"hi"')],
+                )
+            ]
+        ),
         source="",
     )
     return Workspace(concepts={"Counter": counter, "Log": log}, syncs={})
@@ -885,3 +904,58 @@ sync InternalOnly
         assert len(diags) == 1
         assert diags[0].code == "S5"
         assert diags[0].severity == "warning"
+
+
+from concept_lang.validate import validate_workspace
+
+
+class TestValidateWorkspace:
+    def test_clean_workspace_has_no_errors(self):
+        ws = _workspace_with_counter_and_log()
+        diags = validate_workspace(ws)
+        errors = [d for d in diags if d.severity == "error"]
+        assert errors == []
+
+    def test_dirty_workspace_collects_all_concept_diagnostics(self):
+        # A concept whose state references a foreign type and whose
+        # operational principle is empty - expect C1 + C9.
+        bad = ConceptAST(
+            name="Bad",
+            params=[],
+            purpose="do bad things",
+            state=[StateDecl(name="owner", type_expr="User")],
+            actions=[
+                Action(
+                    name="noop",
+                    cases=[
+                        ActionCase(
+                            inputs=[],
+                            outputs=[TypedName(name="ok", type_expr="boolean")],
+                        )
+                    ],
+                )
+            ],
+            operational_principle=OperationalPrinciple(steps=[]),
+            source="",
+        )
+        ws = Workspace(concepts={"Bad": bad}, syncs={})
+        diags = validate_workspace(ws)
+        codes = {d.code for d in diags if d.severity == "error"}
+        assert "C1" in codes
+        assert "C9" in codes
+
+    def test_collects_sync_diagnostics(self):
+        ws = _workspace_with_counter_and_log()
+        ws.syncs["Broken"] = parse_sync_source(
+            """
+sync Broken
+
+  when
+    Counter/inc: [ ] => [ ]
+  then
+    Nowhere/do: [ ]
+"""
+        )
+        diags = validate_workspace(ws)
+        codes = {d.code for d in diags if d.severity == "error"}
+        assert "S1" in codes
