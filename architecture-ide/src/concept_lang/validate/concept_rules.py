@@ -213,3 +213,25 @@ def rule_c5_has_purpose(
             message=f"concept '{concept.name}' has an empty purpose",
         )
     ]
+
+
+def rule_c6_has_actions(
+    concept: ConceptAST,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C6: Every concept has at least one action.
+    """
+    if concept.actions:
+        return []
+    return [
+        Diagnostic(
+            severity="error",
+            file=file,
+            line=None,
+            column=None,
+            code="C6",
+            message=f"concept '{concept.name}' has no actions",
+        )
+    ]

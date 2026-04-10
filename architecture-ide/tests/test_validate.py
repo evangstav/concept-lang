@@ -429,3 +429,45 @@ concept Counter
         diags = rule_c5_has_purpose(ast)
         assert len(diags) == 1
         assert diags[0].code == "C5"
+
+
+from concept_lang.validate import rule_c6_has_actions
+
+
+class TestRuleC6:
+    def test_one_action_is_allowed(self):
+        ast = ConceptAST(
+            name="Counter",
+            params=[],
+            purpose="count things",
+            state=[],
+            actions=[
+                Action(
+                    name="inc",
+                    cases=[
+                        ActionCase(
+                            inputs=[],
+                            outputs=[TypedName(name="total", type_expr="int")],
+                        )
+                    ],
+                )
+            ],
+            operational_principle=OperationalPrinciple(steps=[]),
+            source="",
+        )
+        assert rule_c6_has_actions(ast) == []
+
+    def test_zero_actions_is_flagged(self):
+        ast = ConceptAST(
+            name="Pointless",
+            params=[],
+            purpose="do nothing",
+            state=[],
+            actions=[],
+            operational_principle=OperationalPrinciple(steps=[]),
+            source="",
+        )
+        diags = rule_c6_has_actions(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C6"
+        assert diags[0].severity == "error"
