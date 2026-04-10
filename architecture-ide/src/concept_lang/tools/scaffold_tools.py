@@ -29,37 +29,57 @@ _PRIORITY_PATTERNS = [
 ]
 
 _METHODOLOGY = """\
-You are an expert in Daniel Jackson's concept design methodology from "The Essence of Software".
+You are an expert in Daniel Jackson's concept design methodology as used by concept-lang 0.2.0.
 
-A concept spec has this format:
-    concept Name [Param, ...]
+A concept file has this shape:
+
+    concept <Name> [<TypeParam1>, <TypeParam2>, ...]
+
       purpose
-        One sentence stating the essential service this concept provides.
+        <one sentence — the essential service this concept provides>
 
       state
-        name: set T            (a set of elements of type T)
-        name: parent           (a subset of an existing set)
-        name: T -> set U       (a relation from elements of T to elements of U)
+        <field>: <type-expression>
+        <field>: <type-expression>
+        ...
 
       actions
-        action_name (param: Type, ...)
-          pre: condition clause
-          post: state_change    (use += to add, -= to remove from sets)
+        <action_name> [ <in1>: <T1> ; <in2>: <T2> ] => [ <out1>: <U1> ]
+          <1-4 lines of hybrid natural-language describing the success case>
+          effects: <optional += / -= statements on state fields>
 
-      sync
-        when OtherConcept.action (params) then local_action (params)
-        // or multi-line with conditions:
-        when OtherConcept.action (params) -> result
-          where condition_clause
-          then local_action1 (params)
-               local_action2 (params)
+        <action_name> [ <in1>: <T1> ; <in2>: <T2> ] => [ error: string ]
+          <describe when this case fires>
 
-Key principles:
-- Each concept must have a SINGLE, INDEPENDENT purpose
-- State should be minimal — only what's needed to define action semantics
-- Prefer subset progressions (named: set T / purposeful: named / specified: purposeful)
-  over flat attribute lists when entities have a lifecycle
-- Concepts are INDEPENDENT — no concept should embed another's logic
+        ... (every action should have at least one success case AND at least one error case)
+
+      operational principle
+        after <action_name> [ <in>: <val> ] => [ <out>: <val> ]
+        and   <action_name> [ <in>: <val> ] => [ <out>: <val> ]
+        then  <action_name> [ <in>: <val> ] => [ <out>: <val> ]
+
+Key rules:
+- Each concept has a SINGLE, INDEPENDENT purpose. A concept file stands on its own.
+- State is minimal — only the fields needed by the action semantics.
+- Actions always have named inputs AND named outputs, inside square brackets.
+- Every distinct outcome is its own case block. Do NOT collapse success and error into one case with conditional returns.
+- There is NO inline sync section in a concept file. Syncs live in separate .sync files.
+- The operational principle is its own section, with 2-4 after/and/then steps that walk through a typical scenario.
+
+Syncs are separate .sync files with this shape:
+
+    sync <SyncName>
+
+      when
+        <Concept>/<action>: [ <input_patterns> ] => [ <output_patterns> ]
+
+      where
+        bind (<expression> as ?<variable>)
+
+      then
+        <Concept>/<action>: [ <input_patterns> ]
+
+Syncs compose existing concepts — they may NOT reference actions that do not exist.
 """
 
 
