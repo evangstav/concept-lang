@@ -220,3 +220,57 @@ class TestWorkspace:
         )
         assert ws.concepts["Password"].purpose.startswith("to securely")
         assert ws.syncs["RegisterUser"].when[0].concept == "Web"
+
+
+class TestConceptASTPositions:
+    def test_concept_ast_line_defaults_to_none(self):
+        ast = TestConceptAST()._make_password_concept()
+        assert ast.line is None
+        assert ast.column is None
+
+    def test_state_decl_line_defaults_to_none(self):
+        decl = StateDecl(name="total", type_expr="int")
+        assert decl.line is None
+        assert decl.column is None
+
+    def test_action_line_roundtrip(self):
+        action = Action(
+            name="inc",
+            cases=[ActionCase(inputs=[], outputs=[])],
+            line=12,
+            column=5,
+        )
+        dumped = action.model_dump()
+        assert dumped["line"] == 12
+        assert dumped["column"] == 5
+        assert Action.model_validate(dumped) == action
+
+    def test_action_case_line_roundtrip(self):
+        case = ActionCase(inputs=[], outputs=[], line=15, column=7)
+        assert ActionCase.model_validate(case.model_dump()) == case
+
+    def test_effect_clause_line_roundtrip(self):
+        ec = EffectClause(
+            raw="total := total + 1",
+            field="total",
+            op=":=",
+            rhs="total + 1",
+            line=20,
+            column=9,
+        )
+        assert EffectClause.model_validate(ec.model_dump()) == ec
+
+    def test_operational_principle_line_roundtrip(self):
+        op = OperationalPrinciple(steps=[], line=30, column=3)
+        assert OperationalPrinciple.model_validate(op.model_dump()) == op
+
+    def test_op_step_line_roundtrip(self):
+        step = OPStep(
+            keyword="after",
+            action_name="inc",
+            inputs=[],
+            outputs=[],
+            line=33,
+            column=5,
+        )
+        assert OPStep.model_validate(step.model_dump()) == step

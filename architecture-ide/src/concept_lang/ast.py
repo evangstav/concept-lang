@@ -31,6 +31,8 @@ class EffectClause(BaseModel):
     field: str                        # e.g. "password"
     op: Literal[":=", "+=", "-="]
     rhs: str                          # right-hand side kept as raw text
+    line: int | None = None
+    column: int | None = None
 
 
 # --- Concept ---------------------------------------------------------------
@@ -45,12 +47,16 @@ class ActionCase(BaseModel):
     outputs: list[TypedName]
     body: list[str] = []              # natural-language description lines
     effects: list[EffectClause] = []  # optional formal state deltas
+    line: int | None = None
+    column: int | None = None
 
 
 class Action(BaseModel):
     """An action with one or more cases sharing a name."""
     name: str
     cases: list[ActionCase]
+    line: int | None = None
+    column: int | None = None
 
 
 class OPStep(BaseModel):
@@ -63,17 +69,23 @@ class OPStep(BaseModel):
     action_name: str
     inputs: list[tuple[str, str]]     # e.g. [("user", "x"), ("password", '"secret"')]
     outputs: list[tuple[str, str]]
+    line: int | None = None
+    column: int | None = None
 
 
 class OperationalPrinciple(BaseModel):
     """Archetypal scenario using the concept's own actions."""
     steps: list[OPStep]
+    line: int | None = None
+    column: int | None = None
 
 
 class StateDecl(BaseModel):
     """A state field declaration (Alloy-style type expression)."""
     name: str
     type_expr: str                    # e.g. "set U", "U -> string"
+    line: int | None = None
+    column: int | None = None
 
 
 class ConceptAST(BaseModel):
@@ -85,6 +97,8 @@ class ConceptAST(BaseModel):
     actions: list[Action]
     operational_principle: OperationalPrinciple
     source: str                       # raw source text for diagnostics
+    line: int | None = None
+    column: int | None = None
 
 
 # --- Sync ------------------------------------------------------------------
