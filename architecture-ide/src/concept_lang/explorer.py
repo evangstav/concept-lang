@@ -25,62 +25,6 @@ from concept_lang.ast import (
 )
 
 
-# --- v1 adapter (temporary; removed when diagrams/ migrates) ----------------
-
-
-def _to_v1_concept(c: ConceptAST):
-    """
-    Build a v1 `concept_lang.models.ConceptAST` from a v2 concept so the
-    existing Mermaid diagram generators (and the diagram MCP tools that
-    still operate in v1) keep working until the `diagrams/` module migrates
-    (P5 or later).
-
-    The conversion is lossy:
-
-    * v2 multi-case actions collapse to a single v1 action whose pre/post
-      clauses come from the first case's effects. Additional cases are
-      dropped.
-    * Operational principle is not represented in v1 and is dropped.
-    * Syncs are always empty because v2 holds them in separate files —
-      the v1 `ConceptAST.sync` field is set to ``[]``.
-
-    This helper is intentionally exported (no leading underscore in its
-    public meaning) so that MCP tool modules that still wrap the v1
-    diagram generators can import it without reaching into explorer's
-    internals through a name that pretends to be private.
-    """
-    from concept_lang.models import (
-        Action as V1Action,
-        ConceptAST as V1ConceptAST,
-        PrePost as V1PrePost,
-        StateDecl as V1StateDecl,
-    )
-
-    v1_state = [V1StateDecl(name=s.name, type_expr=s.type_expr) for s in c.state]
-
-    v1_actions: list = []
-    for action in c.actions:
-        first_case = action.cases[0]
-        params = [f"{tn.name}: {tn.type_expr}" for tn in first_case.inputs]
-        post_clauses = [e.raw for e in first_case.effects]
-        v1_actions.append(V1Action(
-            name=action.name,
-            params=params,
-            pre=None,
-            post=V1PrePost(clauses=post_clauses) if post_clauses else None,
-        ))
-
-    return V1ConceptAST(
-        name=c.name,
-        params=c.params,
-        purpose=c.purpose,
-        state=v1_state,
-        actions=v1_actions,
-        sync=[],
-        source=c.source,
-    )
-
-
 # --- concept JSON payload for the HTML ---------------------------------------
 
 
@@ -301,10 +245,6 @@ def generate_explorer(workspace: Workspace) -> str:
     sync_index = _build_sync_index(workspace)
 
     # Per-concept Mermaid diagrams (v2 — consume ConceptAST directly).
-    # Note: `_to_v1_concept` remains defined above as dead code; Batch 2 of
-    # the P7 deletion sweep removes it along with its direct tests. This
-    # use-site was updated alongside the diagrams/ v2 rewrite to keep the
-    # suite green.
     from concept_lang.diagrams import entity_diagram, state_machine
     mermaid_diagrams: dict[str, dict[str, str]] = {}
     for name, c in workspace.concepts.items():
