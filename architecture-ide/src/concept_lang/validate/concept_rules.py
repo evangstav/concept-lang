@@ -3,9 +3,10 @@ Validator rules for a single `ConceptAST` (paper rules C1..C9 except C8).
 
 Each rule is a pure function that takes the concept AST (and, when it
 needs cross-file context, a `WorkspaceIndex`) and returns a list of
-`Diagnostic` records. Line/column information is best-effort: the P1
-parser does not yet attach source positions to AST nodes, so most
-diagnostics produced here use `line=None`.
+`Diagnostic` records. Diagnostics carry source positions pulled from the
+AST nodes they flag: state-scoped rules use the offending node's own
+`line`/`column`, while whole-concept rules (C5/C6/C9) fall back to the
+`ConceptAST`'s position.
 """
 
 import re
@@ -74,8 +75,8 @@ def rule_c1_state_independence(
                 Diagnostic(
                     severity="error",
                     file=file,
-                    line=None,
-                    column=None,
+                    line=decl.line,
+                    column=decl.column,
                     code="C1",
                     message=(
                         f"state field '{decl.name}' references unknown type "
@@ -107,8 +108,8 @@ def rule_c2_effects_independence(
                     Diagnostic(
                         severity="error",
                         file=file,
-                        line=None,
-                        column=None,
+                        line=effect.line,
+                        column=effect.column,
                         code="C2",
                         message=(
                             f"action '{action.name}' has an effect on field "
@@ -138,8 +139,8 @@ def rule_c3_op_principle_independence(
             Diagnostic(
                 severity="error",
                 file=file,
-                line=None,
-                column=None,
+                line=step.line,
+                column=step.column,
                 code="C3",
                 message=(
                     f"operational principle step '{step.keyword} "
@@ -207,8 +208,8 @@ def rule_c5_has_purpose(
         Diagnostic(
             severity="error",
             file=file,
-            line=None,
-            column=None,
+            line=concept.line,
+            column=concept.column,
             code="C5",
             message=f"concept '{concept.name}' has an empty purpose",
         )
@@ -229,8 +230,8 @@ def rule_c6_has_actions(
         Diagnostic(
             severity="error",
             file=file,
-            line=None,
-            column=None,
+            line=concept.line,
+            column=concept.column,
             code="C6",
             message=f"concept '{concept.name}' has no actions",
         )
@@ -262,8 +263,8 @@ def rule_c7_action_has_success_case(
             Diagnostic(
                 severity="error",
                 file=file,
-                line=None,
-                column=None,
+                line=action.line,
+                column=action.column,
                 code="C7",
                 message=(
                     f"action '{action.name}' on concept '{concept.name}' has "
@@ -289,8 +290,8 @@ def rule_c9_has_op_principle(
         Diagnostic(
             severity="error",
             file=file,
-            line=None,
-            column=None,
+            line=concept.line,
+            column=concept.column,
             code="C9",
             message=(
                 f"concept '{concept.name}' has no operational principle steps "

@@ -1259,3 +1259,124 @@ class TestP2Gate:
         present = {name for name in dir(this_module) if name.startswith("TestRule")}
         missing = expected_class_names - present
         assert not missing, f"missing coverage classes: {sorted(missing)}"
+
+
+class TestConceptRulesCarryPositions:
+    """
+    After P3, every concept rule that fires on a positioned AST node must
+    emit a diagnostic whose `line` matches the node's source line.
+    """
+
+    def test_c1_reports_state_decl_line(self):
+        src = (
+            "concept Basket\n"
+            "\n"
+            "  purpose\n"
+            "    hold items\n"
+            "\n"
+            "  state\n"
+            "    owner: User\n"          # line 7 - offending
+            "\n"
+            "  actions\n"
+            "    add [ item: string ] => [ basket: Basket ]\n"
+            "\n"
+            "  operational principle\n"
+            "    after add [ item: \"a\" ] => [ basket: b ]\n"
+        )
+        ast = parse_concept_source(src)
+        diags = rule_c1_state_independence(ast)
+        assert len(diags) == 1
+        assert diags[0].line == 7
+
+    def test_c2_reports_effect_clause_line(self):
+        src = (
+            "concept Counter\n"
+            "\n"
+            "  purpose\n"
+            "    count things\n"
+            "\n"
+            "  state\n"
+            "    total: int\n"
+            "\n"
+            "  actions\n"
+            "    inc [ n: int ] => [ total: int ]\n"
+            "      increment\n"
+            "      effects:\n"
+            "        missing_field := n\n"   # line 13 - offending
+            "\n"
+            "  operational principle\n"
+            "    after inc [ n: 1 ] => [ total: 1 ]\n"
+        )
+        ast = parse_concept_source(src)
+        diags = rule_c2_effects_independence(ast)
+        assert len(diags) == 1
+        assert diags[0].line == 13
+
+    def test_c3_reports_op_step_line(self):
+        src = (
+            "concept Counter\n"
+            "\n"
+            "  purpose\n"
+            "    count things\n"
+            "\n"
+            "  state\n"
+            "    total: int\n"
+            "\n"
+            "  actions\n"
+            "    inc [ ] => [ total: int ]\n"
+            "\n"
+            "  operational principle\n"
+            "    after teleport [ ] => [ total: 1 ]\n"   # line 13 - offending
+        )
+        ast = parse_concept_source(src)
+        diags = rule_c3_op_principle_independence(ast)
+        assert len(diags) == 1
+        assert diags[0].line == 13
+
+    def test_c7_reports_action_line(self):
+        # Action has only error cases - flagged at the action's first case line.
+        src = (
+            "concept Counter\n"
+            "\n"
+            "  purpose\n"
+            "    count things\n"
+            "\n"
+            "  state\n"
+            "    total: int\n"
+            "\n"
+            "  actions\n"
+            "    inc [ n: int ] => [ error: string ]\n"  # line 10
+            "      always fails\n"
+            "\n"
+            "  operational principle\n"
+            "    after inc [ n: 1 ] => [ error: \"x\" ]\n"
+        )
+        ast = parse_concept_source(src)
+        diags = rule_c7_action_has_success_case(ast)
+        assert len(diags) == 1
+        assert diags[0].line == 10
+
+    def test_c5_reports_concept_line(self):
+        # Hand-built because the grammar requires a non-empty purpose body.
+        ast = ConceptAST(
+            name="Empty",
+            params=[],
+            purpose="",   # empty
+            state=[],
+            actions=[
+                Action(
+                    name="noop",
+                    cases=[ActionCase(inputs=[], outputs=[TypedName(name="ok", type_expr="boolean")])],
+                    line=5,
+                )
+            ],
+            operational_principle=OperationalPrinciple(
+                steps=[OPStep(keyword="after", action_name="noop", inputs=[], outputs=[])],
+            ),
+            source="",
+            line=1,
+            column=1,
+        )
+        diags = rule_c5_has_purpose(ast)
+        assert len(diags) == 1
+        assert diags[0].line == 1
