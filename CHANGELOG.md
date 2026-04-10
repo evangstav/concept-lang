@@ -9,6 +9,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _No changes yet._
 
+## [0.3.0] — 2026-04-10 — v1 deletion
+
+`0.3.0` deletes the v1 code that was kept alongside the new v2 code as
+a safety net since `0.2.0`. There are no new features and no new user-
+facing API surface — this is a cleanup release that makes the v2 code
+path the only code path.
+
+### Removed
+
+- `concept_lang.validator` — the v1 hand-written validator. The v2
+  validator lives at `concept_lang.validate` and is the only supported
+  surface for validation.
+- `concept_lang.codegen/` — the v1 code-generation subpackage
+  (`python`, `typescript`, `go` backends) and the `codegen_tools` MCP
+  wrapper. These were dead code since `0.2.0` because the MCP server
+  stopped registering `codegen_tools` in P4. A paper-aligned code
+  generator is a possible future workstream but is not in any
+  committed roadmap.
+- `concept_lang.explorer._to_v1_concept` — the temporary v2 → v1
+  adapter function. Its callers (`concept_lang.tools.diagram_tools`
+  and `concept_lang.explorer._generate_html`) now consume the v2 AST
+  directly.
+- `get_dependency_graph` MCP tool — the back-compat alias introduced
+  in `0.2.0` when the whole-workspace Mermaid graph moved from
+  `diagram_tools` to `workspace_tools`. Use `get_workspace_graph`
+  directly.
+- `tests/test_validator.py` — the v1 test file. Its coverage has been
+  replaced by `tests/test_validate.py` and `tests/test_parse.py`
+  across P2 and P3.
+- `tests/test_explorer.py::TestV1Adapter` — the three tests that
+  pinned the `_to_v1_concept` adapter contract.
+
+### Changed
+
+- `concept_lang.diagrams.state_machine` and
+  `concept_lang.diagrams.entity_diagram` are rewritten to consume
+  `concept_lang.ast.ConceptAST` directly. The semantic contract is
+  unchanged: multi-case actions still use the first case's effects as
+  the canonical transition source. A new `tests/test_diagrams.py`
+  pins the behavior against `Counter` and `Auth` fixture concepts.
+- Plugin version bumped from `0.2.0` to `0.3.0` in
+  `.claude-plugin/plugin.json` and `architecture-ide/pyproject.toml`.
+
+### Legacy v1 subsystem (retained, fenced)
+
+The v1 `.app` format is still supported in `0.3.0`. The four modules
+that back it (`concept_lang.parser`, `concept_lang.models`,
+`concept_lang.app_parser`, `concept_lang.app_validator`) are retained
+and each carries a top-of-file fence marker reading **"Legacy v1
+subsystem — do not extend."** The single consumer of this fenced
+subsystem is `concept_lang.tools.app_tools`, which exposes the
+app-spec MCP tools (`list_apps`, `read_app`, `write_app`,
+`validate_app_spec`, `get_app_dependency_graph`). A follow-up plan
+will migrate the `.app` format to a v2 AST and delete the entire
+legacy subsystem. Until then, do not import from these modules from
+anywhere other than the app-spec bridge.
+
+### References
+
+- Paper: [Meng & Jackson, *What You See Is What It Does: A Structural
+  Pattern for Legible Software*, Onward! '25
+  (arXiv:2508.14511)](https://arxiv.org/abs/2508.14511)
+- Primer: [`docs/methodology.md`](docs/methodology.md)
+- Previous release: [`[0.2.0]`](#020--2026-04-10--paper-alignment)
+
 ## [0.2.0] — 2026-04-10 — Paper alignment
 
 This is a breaking change that aligns `concept-lang` with Meng & Jackson,
@@ -143,5 +208,6 @@ view.
   `architecture-ide/tests/fixtures/architecture_ide/`,
   `architecture-ide/tests/fixtures/realworld/`
 
-[Unreleased]: https://github.com/evangstav/concept-lang/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/evangstav/concept-lang/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/evangstav/concept-lang/releases/tag/v0.3.0
 [0.2.0]: https://github.com/evangstav/concept-lang/releases/tag/v0.2.0
