@@ -119,3 +119,34 @@ def rule_c2_effects_independence(
                     )
                 )
     return diagnostics
+
+
+def rule_c3_op_principle_independence(
+    concept: ConceptAST,
+    *,
+    file: Path | None = None,
+) -> list[Diagnostic]:
+    """
+    C3: Operational principle may only invoke actions of this concept.
+    """
+    diagnostics: list[Diagnostic] = []
+    own_actions: set[str] = {a.name for a in concept.actions}
+    for step in concept.operational_principle.steps:
+        if step.action_name in own_actions:
+            continue
+        diagnostics.append(
+            Diagnostic(
+                severity="error",
+                file=file,
+                line=None,
+                column=None,
+                code="C3",
+                message=(
+                    f"operational principle step '{step.keyword} "
+                    f"{step.action_name}' references action '{step.action_name}' "
+                    f"which is not declared in concept '{concept.name}' "
+                    f"(declared actions: {sorted(own_actions)!r})"
+                ),
+            )
+        )
+    return diagnostics

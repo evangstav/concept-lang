@@ -262,3 +262,53 @@ concept Password [U]
         assert diags[0].code == "C2"
         assert "profile" in diags[0].message
         assert "Password" in diags[0].message
+
+
+from concept_lang.validate import rule_c3_op_principle_independence
+
+
+class TestRuleC3:
+    def test_own_actions_only(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+
+  actions
+    inc [ ] => [ total: int ]
+    read [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+    and read [ ] => [ total: 1 ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c3_op_principle_independence(ast)
+        assert diags == []
+
+    def test_foreign_action_is_flagged(self):
+        src = """
+concept Counter
+
+  purpose
+    count things
+
+  state
+    total: int
+
+  actions
+    inc [ ] => [ total: int ]
+
+  operational principle
+    after inc [ ] => [ total: 1 ]
+    then sendEmail [ body: "hi" ] => [ sent: true ]
+"""
+        ast = parse_concept_source(src)
+        diags = rule_c3_op_principle_independence(ast)
+        assert len(diags) == 1
+        assert diags[0].code == "C3"
+        assert "sendEmail" in diags[0].message

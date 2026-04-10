@@ -8,6 +8,7 @@ Public API (grows across the tasks of the P2 plan):
     Diagnostic
     rule_c1_state_independence
     rule_c2_effects_independence
+    rule_c3_op_principle_independence
     validate_workspace
     validate_concept_file
     validate_sync_file
@@ -16,6 +17,7 @@ Public API (grows across the tasks of the P2 plan):
 from concept_lang.validate.concept_rules import (
     rule_c1_state_independence,
     rule_c2_effects_independence,
+    rule_c3_op_principle_independence,
 )
 from concept_lang.validate.diagnostic import Diagnostic
 
@@ -23,4 +25,5 @@ __all__ = [
     "Diagnostic",
     "rule_c1_state_independence",
     "rule_c2_effects_independence",
+    "rule_c3_op_principle_independence",
 ]
