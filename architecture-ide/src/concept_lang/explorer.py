@@ -300,14 +300,17 @@ def generate_explorer(workspace: Workspace) -> str:
     graph_data = _build_graph_data(workspace)
     sync_index = _build_sync_index(workspace)
 
-    # Per-concept Mermaid diagrams, still generated through the v1 adapter.
+    # Per-concept Mermaid diagrams (v2 — consume ConceptAST directly).
+    # Note: `_to_v1_concept` remains defined above as dead code; Batch 2 of
+    # the P7 deletion sweep removes it along with its direct tests. This
+    # use-site was updated alongside the diagrams/ v2 rewrite to keep the
+    # suite green.
     from concept_lang.diagrams import entity_diagram, state_machine
     mermaid_diagrams: dict[str, dict[str, str]] = {}
     for name, c in workspace.concepts.items():
-        v1 = _to_v1_concept(c)
         mermaid_diagrams[name] = {
-            "state_machine": state_machine(v1),
-            "entity_diagram": entity_diagram(v1),
+            "state_machine": state_machine(c),
+            "entity_diagram": entity_diagram(c),
         }
 
     dep_graph_mermaid = (
