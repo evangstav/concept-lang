@@ -7,7 +7,6 @@ from concept_lang.ast import (
     ActionCase,
     ActionPattern,
     ConceptAST,
-    EffectClause,
     OperationalPrinciple,
     OPStep,
     StateDecl,
@@ -18,7 +17,6 @@ from concept_lang.ast import (
 from concept_lang.explorer import (
     _build_graph_data,
     _build_sync_index,
-    _to_v1_concept,
     _workspace_graph_mermaid,
     generate_explorer,
 )
@@ -156,96 +154,3 @@ class TestGenerateExplorer:
         html = generate_explorer(Workspace())
         assert "<html" in html
         assert "No concepts" in html
-
-
-class TestV1Adapter:
-    def test_to_v1_concept_preserves_core_fields(self):
-        concept = ConceptAST(
-            name="Auth",
-            params=["U"],
-            purpose="authenticate users",
-            state=[StateDecl(name="registered", type_expr="set U")],
-            actions=[
-                Action(
-                    name="register",
-                    cases=[
-                        ActionCase(
-                            inputs=[TypedName(name="user", type_expr="U")],
-                            outputs=[TypedName(name="user", type_expr="U")],
-                            body=["register the user"],
-                            effects=[
-                                EffectClause(
-                                    raw="registered += user",
-                                    field="registered",
-                                    op="+=",
-                                    rhs="user",
-                                )
-                            ],
-                        )
-                    ],
-                )
-            ],
-            operational_principle=OperationalPrinciple(steps=[]),
-            source="",
-        )
-        v1 = _to_v1_concept(concept)
-        assert v1.name == "Auth"
-        assert v1.params == ["U"]
-        assert v1.purpose == "authenticate users"
-        assert len(v1.state) == 1
-        assert v1.state[0].name == "registered"
-        assert v1.state[0].type_expr == "set U"
-        assert len(v1.actions) == 1
-        assert v1.actions[0].name == "register"
-        assert v1.actions[0].params == ["user: U"]
-        assert v1.actions[0].post is not None
-        assert v1.actions[0].post.clauses == ["registered += user"]
-        # Syncs are always empty because v2 holds them in separate files.
-        assert v1.sync == []
-
-    def test_to_v1_concept_action_with_no_effects_has_no_post(self):
-        concept = ConceptAST(
-            name="Noop",
-            params=[],
-            purpose="does nothing",
-            state=[],
-            actions=[
-                Action(
-                    name="ping",
-                    cases=[ActionCase(inputs=[], outputs=[], body=["ping"])],
-                )
-            ],
-            operational_principle=OperationalPrinciple(steps=[]),
-            source="",
-        )
-        v1 = _to_v1_concept(concept)
-        assert len(v1.actions) == 1
-        assert v1.actions[0].post is None
-        assert v1.actions[0].pre is None
-
-    def test_to_v1_concept_multi_case_collapses_to_first_case(self):
-        success = ActionCase(
-            inputs=[TypedName(name="x", type_expr="int")],
-            outputs=[TypedName(name="x", type_expr="int")],
-            body=["success"],
-            effects=[EffectClause(raw="count += 1", field="count", op="+=", rhs="1")],
-        )
-        failure = ActionCase(
-            inputs=[TypedName(name="x", type_expr="int")],
-            outputs=[TypedName(name="err", type_expr="string")],
-            body=["failure"],
-        )
-        concept = ConceptAST(
-            name="Multi",
-            params=[],
-            purpose="multi-case",
-            state=[],
-            actions=[Action(name="step", cases=[success, failure])],
-            operational_principle=OperationalPrinciple(steps=[]),
-            source="",
-        )
-        v1 = _to_v1_concept(concept)
-        # Only the first case's inputs/effects end up in the v1 action.
-        assert v1.actions[0].params == ["x: int"]
-        assert v1.actions[0].post is not None
-        assert v1.actions[0].post.clauses == ["count += 1"]

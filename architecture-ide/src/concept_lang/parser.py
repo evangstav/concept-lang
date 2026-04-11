@@ -1,4 +1,18 @@
 """
+LEGACY FENCE (0.3.0): v1 regex-based .concept parser.
+
+This module is one of four fenced-off legacy survivors kept in the tree
+to back the app-spec bridge in `concept_lang.tools.app_tools`. It is
+NOT the v2 parser — that lives at `concept_lang.parse` and consumes
+`concept_lang.ast` node types.
+
+Do not import from here in new code. The only legitimate consumer is
+`app_tools._load_declared_concepts_v1`, and that path itself is slated
+for a future "app format v2" follow-up plan which will retire this
+module entirely.
+
+Historical description:
+
 Parser for .concept files.
 
 Format:

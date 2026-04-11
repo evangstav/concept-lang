@@ -1,10 +1,13 @@
 """
-MCP tool registrations for concept-lang 0.2.0.
+MCP tool registrations for concept-lang 0.3.0.
 
-The code-generation tools (`codegen_tools`) are intentionally NOT
-re-exported: per the paper-alignment spec §5.3 they stay on v1 until a
-dedicated migration and are not exposed via the MCP server in P4. The
-source file is preserved so a future phase can rewire it quickly.
+Every tool module registered below operates on the v2 AST
+(`concept_lang.ast`) and the v2 parser (`concept_lang.parse`). The
+v1 app-spec bridge (`.app_tools`) is the only tool module that
+touches the fenced-off legacy subsystem (`concept_lang.parser`,
+`concept_lang.models`, `concept_lang.app_parser`,
+`concept_lang.app_validator`); see those modules for the fence
+contract.
 """
 
 from .app_tools import register_app_tools

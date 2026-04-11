@@ -6,7 +6,6 @@ from mcp.server.fastmcp import FastMCP
 
 from concept_lang.ast import ConceptAST
 from concept_lang.diagrams import entity_diagram, state_machine
-from concept_lang.explorer import _to_v1_concept
 from concept_lang.parse import parse_concept_file
 
 from ._io import concepts_dir_for
@@ -31,7 +30,7 @@ def register_diagram_tools(mcp: FastMCP, workspace_root: str) -> None:
     )
     def get_state_machine(name: str) -> str:
         try:
-            return state_machine(_to_v1_concept(_load(name)))
+            return state_machine(_load(name))
         except FileNotFoundError as e:
             return f"// Error: {e}"
         except Exception as e:
@@ -48,7 +47,7 @@ def register_diagram_tools(mcp: FastMCP, workspace_root: str) -> None:
     )
     def get_entity_diagram(name: str) -> str:
         try:
-            return entity_diagram(_to_v1_concept(_load(name)))
+            return entity_diagram(_load(name))
         except FileNotFoundError as e:
             return f"// Error: {e}"
         except Exception as e:

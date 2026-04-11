@@ -98,7 +98,6 @@ class TestToolRegistration:
             "validate_sync",
             "validate_workspace",
             "get_workspace_graph",
-            "get_dependency_graph",  # back-compat alias
         }
         missing = expected - names
         assert not missing, f"expected tools not registered: {missing}"

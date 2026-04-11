@@ -217,12 +217,6 @@ class TestGetWorkspaceGraph:
         s = mcp.tools["get_workspace_graph"]()
         assert "No concepts" in s or "No syncs" in s
 
-    def test_dependency_graph_alias_matches_workspace_graph(self):
-        mcp = _make_mcp(FIXTURES / "clean")
-        new = mcp.tools["get_workspace_graph"]()
-        old = mcp.tools["get_dependency_graph"]()
-        assert new == old
-
 
 # ---------------------------------------------------------------------------
 # Diff tools (smoke tests)

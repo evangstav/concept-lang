@@ -1,4 +1,16 @@
 """
+LEGACY FENCE (0.3.0): v1 app-spec validator.
+
+This module is one of four fenced-off legacy survivors kept in the tree
+to back the app-spec bridge in `concept_lang.tools.app_tools`. It is
+NOT the v2 validator — that lives at `concept_lang.validate` with the
+13 paper-aligned rules (C1-C9 sans C8, S1-S5).
+
+Do not import from here in new code. The only legitimate consumer is
+`concept_lang.tools.app_tools`.
+
+Historical description:
+
 Validate an AppSpec against its concept definitions.
 
 Checks:

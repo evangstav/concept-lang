@@ -1,0 +1,28 @@
+concept DesignSession [Designer, Topic]
+
+  purpose
+    structure an iterative conversation in which a designer refines a single topic
+
+  state
+    sessions: set Topic
+    active: set Topic
+
+  actions
+    start [ topic: Topic ; designer: Designer ] => [ topic: Topic ]
+      begin a new design session on the topic
+      effects:
+        sessions += topic
+        active += topic
+
+    advance [ topic: Topic ] => [ topic: Topic ]
+      move the session forward by one refinement step
+
+    finish [ topic: Topic ] => [ topic: Topic ]
+      close the session; topic remains in sessions but no longer active
+      effects:
+        active -= topic
+
+  operational principle
+    after start [ topic: t ; designer: d ] => [ topic: t ]
+    and advance [ topic: t ] => [ topic: t ]
+    then finish [ topic: t ] => [ topic: t ]

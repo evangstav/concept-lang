@@ -1,11 +1,16 @@
 """
-concept-lang 0.2.0 public API.
+concept-lang 0.3.0 public API.
 
-The v1 modules (`concept_lang.parser`, `concept_lang.models`,
-`concept_lang.validator`, `concept_lang.app_parser`,
-`concept_lang.app_validator`) are still importable via their fully
-qualified paths for the sake of the app-spec tool path and legacy tests,
-but the package-level namespace only exposes the v2 surface.
+The v2 surface (AST, parser, loader, validator, diff, explorer, MCP
+server) is re-exported below.
+
+Legacy v1 subsystem: `concept_lang.parser`, `concept_lang.models`,
+`concept_lang.app_parser`, and `concept_lang.app_validator` are still
+importable via their fully qualified paths because they back the v1
+app-spec bridge (`concept_lang.tools.app_tools`). **Do not extend
+these modules.** A follow-up plan migrates the `.app` format to a v2
+AST and a v2 validator; at that point the legacy subsystem is
+deleted outright.
 """
 
 from concept_lang.ast import (

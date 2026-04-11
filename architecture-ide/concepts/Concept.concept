@@ -1,0 +1,44 @@
+concept Concept [Name, Designer]
+
+  purpose
+    define a named self-contained unit of software functionality with explicit state and operations
+
+  state
+    named: set Name
+    purposeful: set Name
+    specified: set Name
+
+  actions
+    introduce [ name: Name ] => [ name: Name ]
+      register a new concept by name
+      effects:
+        named += name
+
+    articulate [ name: Name ] => [ name: Name ]
+      state the concept's purpose
+      effects:
+        purposeful += name
+
+    specify [ name: Name ] => [ name: Name ]
+      fill in state actions and operational principle
+      effects:
+        specified += name
+
+    revise [ name: Name ] => [ name: Name ]
+      mark a specified concept as dirty for re-specification
+      effects:
+        specified -= name
+
+    retire [ name: Name ] => [ name: Name ]
+      remove a concept entirely
+      effects:
+        named -= name
+        purposeful -= name
+        specified -= name
+
+  operational principle
+    after introduce [ name: c ] => [ name: c ]
+    and articulate [ name: c ] => [ name: c ]
+    and specify [ name: c ] => [ name: c ]
+    then revise [ name: c ] => [ name: c ]
+    and specify [ name: c ] => [ name: c ]

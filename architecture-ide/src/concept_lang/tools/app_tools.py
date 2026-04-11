@@ -1,9 +1,20 @@
 """MCP tools for app specs (concept composition layer).
 
-App specs still use the v1 `.app` format; `concept_lang.app_parser` and
-`concept_lang.app_validator` are unchanged and will stay on v1 until a
-dedicated follow-up plan migrates them. P4 only adjusts this file to
-honor the new `workspace_root` parameter and the new workspace layout.
+LEGACY BRIDGE (0.3.0): this is the single legitimate consumer of the
+four fenced-off v1 modules (`concept_lang.parser`, `models`,
+`app_parser`, `app_validator`). The v2 concept format introduced in
+P1-P6 does not have an app-spec equivalent, so app specs stay on the
+v1 format until a dedicated follow-up plan migrates this layer in a
+future release.
+
+Known latent issue: `_load_declared_concepts_v1` runs the v1 parser
+over `.concept` files, but P6 migrated those files to v2 format. The
+path is invisible to test because no pytest covers `validate_app_spec`
+or `get_app_dependency_graph`. The app-format-v2 follow-up plan is the
+right place to fix this.
+
+P4 adjusted this file to honor the new `workspace_root` parameter and
+the new workspace layout. P7 added the fence docstrings.
 """
 
 from __future__ import annotations
