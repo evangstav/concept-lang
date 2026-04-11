@@ -1,14 +1,9 @@
 {
   "diagnostics": [
     {
-      "code": "C3",
-      "severity": "error",
-      "line": null
-    },
-    {
       "code": "C6",
       "severity": "error",
-      "line": null
+      "line": 1
     }
   ]
 }
