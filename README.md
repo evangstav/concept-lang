@@ -109,9 +109,12 @@ my-workspace/
 
 The plugin ships with two example workspaces under `architecture-ide/`:
 
-- `architecture-ide/concepts/` + `architecture-ide/syncs/` + `architecture-ide/apps/`
-  — the self-hosting architecture-ide workspace (four concepts, three
-  syncs, one app spec). Used as the canonical dogfood example.
+- `architecture-ide/.concepts/` — the self-hosting architecture-ide
+  workspace (four concepts, three syncs, one app spec) laid out as
+  `.concepts/concepts/`, `.concepts/syncs/`, and `.concepts/apps/`.
+  Used as the canonical dogfood example and demonstrates the
+  recommended `.concepts/` hidden-directory convention introduced
+  in 0.3.1.
 - `architecture-ide/tests/fixtures/realworld/` — six concepts and six
   syncs recreating the paper's canonical RealWorld case study.
 

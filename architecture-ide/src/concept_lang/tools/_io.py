@@ -16,10 +16,11 @@ def resolve_workspace_root(raw: str) -> Path:
 
     Heuristic:
     * If ``raw`` points at a directory whose basename is ``concepts`` or
-      ``syncs``, treat its **parent** as the workspace root. This keeps
-      existing installations that set ``CONCEPTS_DIR=./concepts`` working
-      without changes.
-    * Otherwise treat ``raw`` itself as the workspace root.
+      ``syncs`` (without the leading dot), treat its **parent** as the
+      workspace root. This keeps legacy installations that set
+      ``CONCEPTS_DIR=./concepts`` working without changes.
+    * Otherwise (including ``.concepts`` — the 0.3.1+ hidden-directory
+      convention) treat ``raw`` itself as the workspace root.
     """
     p = Path(raw).expanduser()
     if p.name in ("concepts", "syncs"):

@@ -12,7 +12,7 @@
     "concepts_dir": {
       "type": "directory",
       "title": "Concepts directory",
-      "description": "Path to your .concept files directory (e.g., ./concepts or ~/my-project/concepts)",
+      "description": "Path to your concept-lang workspace root (e.g., .concepts — a hidden directory containing concepts/, syncs/, and apps/ subdirectories). If left blank, concept-lang defaults to ./.concepts in your current working directory.",
       "sensitive": false
     }
   }
