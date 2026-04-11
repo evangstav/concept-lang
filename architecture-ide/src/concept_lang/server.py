@@ -30,8 +30,10 @@ def _resolve_workspace_root_arg(workspace_root: str | None) -> str:
       3. the legacy `CONCEPTS_DIR` environment variable (for back-compat
          with existing installations; the tool layer's
          `resolve_workspace_root` helper will walk up one level if the
-         value ends in `/concepts`)
-      4. the literal string `./concepts` (legacy default)
+         value ends in `/concepts` or `/syncs`)
+      4. the literal string `.concepts` (the 0.3.1+ convention — a
+         hidden directory at the project root containing `concepts/`,
+         `syncs/`, and optionally `apps/` subdirectories)
     """
     if workspace_root is not None:
         return workspace_root
@@ -41,7 +43,7 @@ def _resolve_workspace_root_arg(workspace_root: str | None) -> str:
     env = os.environ.get("CONCEPTS_DIR")
     if env:
         return env
-    return "./concepts"
+    return ".concepts"
 
 
 def create_server(workspace_root: str | None = None) -> FastMCP:
