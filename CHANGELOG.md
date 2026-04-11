@@ -57,14 +57,15 @@ path the only code path.
 The v1 `.app` format is still supported in `0.3.0`. The four modules
 that back it (`concept_lang.parser`, `concept_lang.models`,
 `concept_lang.app_parser`, `concept_lang.app_validator`) are retained
-and each carries a top-of-file fence marker reading **"Legacy v1
-subsystem — do not extend."** The single consumer of this fenced
-subsystem is `concept_lang.tools.app_tools`, which exposes the
-app-spec MCP tools (`list_apps`, `read_app`, `write_app`,
-`validate_app_spec`, `get_app_dependency_graph`). A follow-up plan
-will migrate the `.app` format to a v2 AST and delete the entire
-legacy subsystem. Until then, do not import from these modules from
-anywhere other than the app-spec bridge.
+and each carries a top-of-file docstring beginning **"LEGACY FENCE
+(0.3.0):"**. The single consumer of this fenced subsystem is
+`concept_lang.tools.app_tools`, whose docstring begins **"LEGACY
+BRIDGE (0.3.0):"**, and which exposes the app-spec MCP tools
+(`list_apps`, `read_app`, `write_app`, `validate_app_spec`,
+`get_app_dependency_graph`). A follow-up plan will migrate the `.app`
+format to a v2 AST and delete the entire legacy subsystem. Until
+then, do not import from these modules from anywhere other than the
+app-spec bridge.
 
 ### References
 
