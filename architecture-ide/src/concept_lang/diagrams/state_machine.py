@@ -16,11 +16,11 @@ Handles two state-declaration patterns:
      c) base set added  → [*] --> base
      d) deepest subset removed  → subset --> parent
 
-v2 notes: a v2 action can have multiple cases. This generator looks at
-the first case's `effects` list because that is the same contract the
-old `_to_v1_concept` adapter exposed (and the contract the existing MCP
-`get_state_machine` tool pinned). If an action has no effects or no
-cases, it renders as a self-loop on the principal state.
+v2 notes: a v2 action can have multiple cases. This generator picks the
+first case's `effects` list as the canonical transition source - the
+remaining cases are typically error / no-op outcomes that should not
+introduce extra arrows. If an action has no effects or no cases, it
+renders as a self-loop on the principal state.
 """
 
 from __future__ import annotations
