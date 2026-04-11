@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _No changes yet._
 
+## [0.3.1] — 2026-04-11 — `.concepts/` convention
+
+`0.3.1` establishes `.concepts/` as the canonical hidden-directory
+convention for concept-lang workspaces, matching common tool patterns
+(`.git`, `.github`, `.vscode`, `.claude`, etc.). No behavioral changes
+to the parser, validator, loader, or MCP tools — this release is about
+making the default layout match a real user-facing convention.
+
+### Changed
+
+- **Runtime dogfood workspace relocated.** The plugin's self-hosting
+  example workspace moved from
+  `architecture-ide/{concepts,syncs,apps}/` to
+  `architecture-ide/.concepts/{concepts,syncs,apps}/`. All four
+  concepts and three syncs move with it.
+- **Default server workspace root.** When `CONCEPTS_DIR` /
+  `WORKSPACE_DIR` is unset, `create_server()` now defaults to
+  `".concepts"` instead of `"./concepts"`. The previous default
+  relied on `resolve_workspace_root`'s walk-up trick (basename
+  `concepts` → parent directory) to effectively mean "the current
+  working directory"; the new default points at a real hidden
+  subdirectory that users are expected to create in their project
+  root.
+- **Plugin user-config description** now recommends `.concepts` as
+  the canonical value and explains the convention.
+
+### Migration
+
+Users who were relying on the old default (unlikely — it was
+effectively "plugin directory") should set `CONCEPTS_DIR` explicitly
+in their plugin config, or create a `.concepts/` directory with
+`concepts/` and `syncs/` subdirectories in their project root.
+
+Users who set `CONCEPTS_DIR=./concepts` explicitly continue to work
+via the unchanged `resolve_workspace_root` walk-up heuristic (the
+basename `concepts` / `syncs` still resolves to the parent).
+
+### References
+
+- Paper: [arXiv:2508.14511](https://arxiv.org/abs/2508.14511)
+- Related code:
+  `architecture-ide/src/concept_lang/server.py` (default resolution),
+  `architecture-ide/src/concept_lang/tools/_io.py`
+  (`resolve_workspace_root` heuristic)
+
 ## [0.3.0] — 2026-04-10 — v1 deletion
 
 `0.3.0` deletes the v1 code that was kept alongside the new v2 code as
@@ -209,6 +254,7 @@ view.
   `architecture-ide/tests/fixtures/architecture_ide/`,
   `architecture-ide/tests/fixtures/realworld/`
 
-[Unreleased]: https://github.com/evangstav/concept-lang/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/evangstav/concept-lang/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/evangstav/concept-lang/releases/tag/v0.3.1
 [0.3.0]: https://github.com/evangstav/concept-lang/releases/tag/v0.3.0
 [0.2.0]: https://github.com/evangstav/concept-lang/releases/tag/v0.2.0
